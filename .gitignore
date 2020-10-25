@@ -1,0 +1,13 @@
+﻿################################################################################
+# Ten plik .gitignore został utworzony automatycznie przez Microsoft(R) Visual Studio.
+################################################################################
+
+/PowerUp.Tests/bin/Debug/net5.0
+/.vs/PowerUp
+/PowerUp.Tests/obj
+/src/PowerUp.Console/bin/Debug/netcoreapp3.1
+/src/PowerUp.Console/obj
+/src/PowerUp.Core/bin/Debug
+/src/PowerUp.Core/obj
+/src/PowerUp.Tests/bin/Debug/net5.0
+/src/PowerUp.Tests/obj
