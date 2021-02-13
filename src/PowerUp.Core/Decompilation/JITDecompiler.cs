@@ -1,17 +1,18 @@
-﻿using PowerUp.Core.Decompilation;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
-using System.Text;
 using System.Linq;
 using Iced.Intel;
 using Microsoft.Diagnostics.Runtime;
-using System.Diagnostics.CodeAnalysis;
 
-namespace PowerUp.Core.Decompiler
+namespace PowerUp.Core.Decompilation
 {
-    public class JITCodeDecompiler
+    /// <summary>
+    /// Decompiles runtime methods and extracts native assembly code, both
+    /// for non tiered and tiered comppilations.
+    /// </summary>
+    public class JitCodeDecompiler
     {
         public DecompiledMethod DecompileMethod(MethodInfo method, string functionCallName = null)
         {
@@ -59,7 +60,6 @@ namespace PowerUp.Core.Decompiler
                 // https://github.com/microsoft/clrmd/issues/303
                 dataTarget.DataReader.Flush();
 
-
                 return DecompileMethod(runtime, codePtr, codeSize, name);
             }
         }
@@ -87,6 +87,8 @@ namespace PowerUp.Core.Decompiler
                 //
                 AssemblyInstruction assemblyInstruction = new AssemblyInstruction();
                 assemblyInstruction.Instruction = instructionName;
+                assemblyInstruction.Address = instruction.IP;
+                assemblyInstruction.RefAddress = instruction.MemoryAddress64;
 
                 if (instAndArgs.Length > 1)
                 {
@@ -110,7 +112,7 @@ namespace PowerUp.Core.Decompiler
                         {
                             Value = hasAddress && instructionName == "call" ? name : instAndArgs[i],
                             CallAdress = address,
-                            CallCodeSize = codeSize
+                            CallCodeSize = size,
                         };
                     }
                 }
@@ -125,7 +127,7 @@ namespace PowerUp.Core.Decompiler
             return new DecompiledMethod()
             {
                 Instructions = instructions,
-                CodeAdresss = codePtr,
+                CodeAddress = codePtr,
                 CodeSize = codeSize
             };
         }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Linq;
 using NetConsole = System.Console;
 
@@ -85,7 +84,7 @@ namespace PowerUp.Core.Console
 
         public static void DrawSeparator(int len)
         {
-            WriteLine(new string(ConsoleBorderStyle.topBottom, len));
+            WriteLine(new string(ConsoleBorderStyle.TopBottom, len));
         }
 
         public static void DrawSeparator(int len, int x, int y)
@@ -94,7 +93,7 @@ namespace PowerUp.Core.Console
             var yc = NetConsole.CursorTop;
 
             NetConsole.SetCursorPosition(x, y);
-            WriteLine(new string(ConsoleBorderStyle.topBottom, len));
+            WriteLine(new string(ConsoleBorderStyle.TopBottom, len));
             NetConsole.SetCursorPosition(xc, yc);
         }
 
@@ -157,25 +156,25 @@ namespace PowerUp.Core.Console
         private static string CreateBorderTop(int size = 1)
         {
             return
-                ConsoleBorderStyle.topLeft.ToString() +
-                new string(ConsoleBorderStyle.topBottom, size) +
-                ConsoleBorderStyle.topRight.ToString();
+                ConsoleBorderStyle.TopLeft.ToString() +
+                new string(ConsoleBorderStyle.TopBottom, size) +
+                ConsoleBorderStyle.TopRight.ToString();
         }
 
         private static string CreateBorderBottom(int size = 1)
         {
             return
-                ConsoleBorderStyle.separatorBottom.ToString() +
-                new string(ConsoleBorderStyle.topBottom, size) +
-                ConsoleBorderStyle.separatorBottom.ToString();
+                ConsoleBorderStyle.SeparatorBottom.ToString() +
+                new string(ConsoleBorderStyle.TopBottom, size) +
+                ConsoleBorderStyle.SeparatorBottom.ToString();
         }
 
         private static string CreateCell(string value)
         {
             return
-                ConsoleBorderStyle.left.ToString() +
+                ConsoleBorderStyle.Left.ToString() +
                 value +
-                ConsoleBorderStyle.right.ToString();
+                ConsoleBorderStyle.Right.ToString();
         }
 
         struct ConsolePattern
@@ -183,20 +182,20 @@ namespace PowerUp.Core.Console
             public ConsoleColor Color;
         }
 
-        struct ConsoleBorderStyle
+        public struct ConsoleBorderStyle
         {
-            public const char topBottom = '─';
-            public const char left = '│';
-            public const char right = '│';
-            public const char topRight = '┐';
-            public const char topLeft = '┌';
-            public const char bottomLeft = '└';
-            public const char bottomRight = '┘';
-            public const char separatorLeft = '├';
-            public const char separatorRight = '┤';
-            public const char separatorTop = '┬';
-            public const char separatorBottom = '┴';
-            public const char seprataroBoth = '┼';
+            public const char TopBottom = '─';
+            public const char Left = '│';
+            public const char Right = '│';
+            public const char TopRight = '┐';
+            public const char TopLeft = '┌';
+            public const char BottomLeft = '└';
+            public const char BottomRight = '┘';
+            public const char SeparatorLeft = '├';
+            public const char SeparatorRight = '┤';
+            public const char SeparatorTop = '┬';
+            public const char SeparatorBottom = '┴';
+            public const char SeparatorBoth = '┼';
         }
     }
 }
