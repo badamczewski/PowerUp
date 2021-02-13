@@ -28,3 +28,32 @@ QuickBenchmark.Measure(() => {
   });
 
 ```
+
+## JIT Dissasembler
+
+To disassemble JIT code, you need to extract the method info using reflection and call the extension method ToAsm(). This will get native assembly code in tier0. To get a higher Tier, you need to provide the delegate that will call the method, and over time the compiler will re-JIT it to Tier1. If you want to skip this, you can compile your project with:  
+
+```<TieredCompilation>false</TieredCompilation>```
+
+Example:
+
+```csharp
+
+   typeof(Program)
+       .GetMethod("DecompilationTestMethod")
+       .ToAsm()
+       .Print();
+```
+
+Example for Tier1:
+
+```csharp
+
+    typeof(Program)
+        .GetMethod("DecompilationTestMethod")
+        .ToAsm(() => p.DecompilationTestMethod(10))
+        .tier1
+        .Print();
+```
+
+There are no guarantees that Tier1 will always be available; Very short and fast methods tend not to be promoted. Code that contains loops is always optimized so you should not bother with this method and switch back to the simpler version.
