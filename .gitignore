@@ -16,3 +16,5 @@
 /PowerUp.Common/bin/Debug/netstandard2.0
 /src/PowerUp.Core/bin/Release
 /src/PowerUp.Tests/bin
+/src/PowerUp.Watcher/bin/Debug/net5.0
+/src/PowerUp.Watcher/obj

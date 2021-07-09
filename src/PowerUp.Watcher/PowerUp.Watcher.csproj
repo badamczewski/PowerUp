@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\PowerUp.Core\PowerUp.Core.csproj" />
+    <ProjectReference Include="..\PowerUp.Core\PowerUp.Core.csproj" />
   </ItemGroup>
 
 </Project>

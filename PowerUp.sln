@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PowerUp.Core", "src\PowerUp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PowerUp.Tests", "src\PowerUp.Tests\PowerUp.Tests.csproj", "{52CE6D27-EF22-4E02-9876-8F4CF87C9E13}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PowerUp.Watcher", "CompilerWatcher\PowerUp.Watcher.csproj", "{9468C9C1-E6E2-40DC-9171-0B993A91F81C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PowerUp.Watcher", "src\PowerUp.Watcher\PowerUp.Watcher.csproj", "{9468C9C1-E6E2-40DC-9171-0B993A91F81C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

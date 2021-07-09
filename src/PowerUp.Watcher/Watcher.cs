@@ -18,7 +18,7 @@ using PowerUp.Core.Decompilation;
 using System.Threading.Tasks;
 using PowerUp.Core.Compilation;
 
-namespace CompilerWatcher
+namespace PowerUp.Watcher
 {
     public class Watcher
     {
