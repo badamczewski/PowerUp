@@ -32,6 +32,16 @@ namespace PowerUp.Core.Decompilation
                 var decompiledMethod = DecompileMethod(runtime, topLevelDelegateAddress.codePointer,
                     topLevelDelegateAddress.codeSize, functionCallName);
 
+                var @params = method.GetParameters();
+                decompiledMethod.Name = method.Name;
+                decompiledMethod.Return = method.ReturnType.Name;
+                decompiledMethod.Arguments = new string[@params.Length];
+
+                int idx = 0;
+                foreach(var parameter in @params)
+                {
+                    decompiledMethod.Arguments[idx++] = parameter.ParameterType.Name;
+                }
                 return decompiledMethod;
             }
         }
@@ -74,14 +84,18 @@ namespace PowerUp.Core.Decompilation
             var reader = new ByteArrayCodeReader(codeBuffer.ToArray());
             var decoder = Iced.Intel.Decoder.Create(64, reader);
             decoder.IP = codePtr;
-
+            
             while (reader.CanReadByte)
             {
                 decoder.Decode(out var instruction);
 
                 var inst = instruction.ToString();
-                var instAndArgs = inst.Split(new char[] { ' ', ',' });
-                var instructionName = instAndArgs[0];
+                var instNameIndex = inst.IndexOf(' ');
+                var instructionName = inst;
+
+                if (instNameIndex != -1)
+                    instructionName = inst.Substring(0, instNameIndex);
+
                 //
                 // Parse Arguments
                 //
@@ -89,9 +103,13 @@ namespace PowerUp.Core.Decompilation
                 assemblyInstruction.Instruction = instructionName;
                 assemblyInstruction.Address = instruction.IP;
                 assemblyInstruction.RefAddress = instruction.MemoryAddress64;
+                assemblyInstruction.OpCode = instruction.OpCode.ToString();
 
-                if (instAndArgs.Length > 1)
+                if (instNameIndex > 0)
                 {
+                    var argumentSegment = inst.Substring(instNameIndex);
+                    var args = argumentSegment.Split(',');
+
                     ulong address = 0;
                     string name = null;
                     uint size = 0;
@@ -105,14 +123,35 @@ namespace PowerUp.Core.Decompilation
                         return DecompileMethod(runtime, address, size);
                     }
 
-                    assemblyInstruction.Arguments = new InstructionArg[instAndArgs.Length - 1];
-                    for (int i = 1; i < instAndArgs.Length; i++)
+                    assemblyInstruction.Arguments = new InstructionArg[args.Length];
+                    for (int i = 0; i < args.Length; i++)
                     {
-                        assemblyInstruction.Arguments[i - 1] = new InstructionArg()
+                        var value = args[i];
+                        string altValue = null;
+                        if(hasAddress && address != codePtr)
                         {
-                            Value = hasAddress && instructionName == "call" ? name : instAndArgs[i],
+                            value = name;
+                            altValue = args[i];
+                        }
+
+                        bool isAddressing = false;
+                        //
+                        // Adressing, set the flag.
+                        //
+                        if(value.StartsWith("[") && value.EndsWith("]"))
+                        {
+                            isAddressing = true;
+                            //value = value.Substring(1, value.Length - 2);
+                        }
+
+                        assemblyInstruction.Arguments[i] = new InstructionArg()
+                        {
+                            Value = value,
                             CallAdress = address,
                             CallCodeSize = size,
+                            HasReferenceAddress = hasAddress,
+                            AltValue = altValue,
+                            IsAddressing = isAddressing
                         };
                     }
                 }
@@ -189,7 +228,7 @@ namespace PowerUp.Core.Decompilation
             var methodDescriptor = runtime.GetMethodByHandle(refAddress);
             if (methodDescriptor != null)
             {
-                name = methodDescriptor.Name;
+                name = methodDescriptor.ToString();
                 refAddress = methodDescriptor.HotColdInfo.HotStart;
                 codeSize = methodDescriptor.HotColdInfo.HotSize;
                 return true;
@@ -198,7 +237,7 @@ namespace PowerUp.Core.Decompilation
             var methodCall = runtime.GetMethodByAddress(refAddress);
             if (methodCall != null && string.IsNullOrWhiteSpace(methodCall.Name) == false)
             {
-                name = methodCall.Name;
+                name = methodCall.ToString();
                 refAddress = methodCall.HotColdInfo.HotStart;
                 codeSize = methodCall.HotColdInfo.HotSize;
                 return true;
@@ -212,7 +251,7 @@ namespace PowerUp.Core.Decompilation
                 if (methodCall is null)
                     return false;
 
-                name = methodCall.Name;
+                name = methodCall.ToString();
                 refAddress = methodCall.HotColdInfo.HotStart;
                 codeSize = methodCall.HotColdInfo.HotSize;
 

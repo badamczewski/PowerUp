@@ -16,6 +16,8 @@
   <ItemGroup>
     <PackageReference Include="Iced" Version="1.9.0" />
     <PackageReference Include="ICSharpCode.Decompiler" Version="6.2.1.6137" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.10.0" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="Microsoft.Diagnostics.Runtime" Version="1.1.142101" />
   </ItemGroup>
 

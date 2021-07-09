@@ -11,3 +11,8 @@
 /src/PowerUp.Core/obj
 /src/PowerUp.Tests/bin/Debug/net5.0
 /src/PowerUp.Tests/obj
+/CompilerWatcher/bin/Debug/net5.0
+/CompilerWatcher/obj
+/PowerUp.Common/bin/Debug/netstandard2.0
+/src/PowerUp.Core/bin/Release
+/src/PowerUp.Tests/bin

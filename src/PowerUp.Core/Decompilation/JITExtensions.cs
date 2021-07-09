@@ -1,12 +1,41 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using PowerUp.Core.Console;
 
 namespace PowerUp.Core.Decompilation
 {
     public static class JitExtensions
     {
+        public static DecompiledMethod[] ToAsm(this Type typeInfo, bool @private = false)
+        {
+            List<DecompiledMethod> methods = new List<DecompiledMethod>();
+
+            foreach (var constructorInfo in typeInfo.GetConstructors())
+            {
+                RuntimeHelpers.PrepareMethod(constructorInfo.MethodHandle);
+            }
+
+            var flags = BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance;
+            if (@private)
+            {
+                flags |= BindingFlags.NonPublic;
+            }
+
+            foreach (var methodInfo in typeInfo.GetMethods(flags))
+            {
+                if (methodInfo.DeclaringType != typeof(System.Object))
+                {
+                    var decompiledMethod = ToAsm(methodInfo);
+                    methods.Add(decompiledMethod);
+                }
+            }
+
+            return methods.ToArray();
+        }
+
         /// <summary>
         /// Extracts native assembly code from method.
         /// This method will only provide a tier0 or optimizedTier (for loops) native assembly
@@ -72,6 +101,22 @@ namespace PowerUp.Core.Decompilation
         public static void Print(this DecompiledMethod method)
         {
             XConsole.WriteLine(method.ToString());
+        }
+
+        /// <summary>
+        /// Prints assembly code of the decompiled method.
+        /// </summary>
+        /// <param name="method"></param>
+        public static string Print(this DecompiledMethod[] methods)
+        {
+            StringBuilder @string = new StringBuilder();
+            foreach (var method in methods)
+            {
+                @string.Append(method.ToString());
+                XConsole.WriteLine(method.ToString());
+            }
+
+            return @string.ToString();
         }
 
     }
