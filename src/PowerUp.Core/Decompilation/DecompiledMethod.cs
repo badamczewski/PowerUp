@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PowerUp.Core.Errors;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -7,17 +8,10 @@ namespace PowerUp.Core.Decompilation
 {
     public class DecompilationUnit
     {
-        public Error[] Errors { get; set; }
+        public Error[] Errors { get; set; }  = Array.Empty<Error>();
         public DecompiledMethod[] DecompiledMethods { get; set; }
         public ILToken[] ILCode { get; set; }
     }
-
-    public class Error
-    {
-        public string Id { get; set; }
-        public string Message { get; set; }
-    }
-
 
     public enum ILTokenType
     {

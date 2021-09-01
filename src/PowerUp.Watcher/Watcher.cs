@@ -17,6 +17,7 @@ using System.Web;
 using PowerUp.Core.Decompilation;
 using System.Threading.Tasks;
 using PowerUp.Core.Compilation;
+using PowerUp.Core.Errors;
 
 namespace PowerUp.Watcher
 {
@@ -57,16 +58,31 @@ namespace PowerUp.Watcher
                                 string asmCode = string.Empty;
                                 string ilCode = string.Empty;
 
-                                if (unit.DecompiledMethods != null)
+                                if (unit.Errors.Length > 0)
                                 {
-                                    asmCode = ToAsm(unit);
+                                    StringBuilder errorBuilder = new StringBuilder();
+                                    foreach (var error in unit.Errors)
+                                    {
+                                        errorBuilder.AppendLine($"{error.Message} {error.Trace} {error.Position}");
+                                        errorBuilder.AppendLine($"{Environment.NewLine}-----------------------------");
+                                    }
+                                    var errors = errorBuilder.ToString();
+                                    File.WriteAllText(outAsmFile, errors);
+                                    File.WriteAllText(outILFile, errors);
                                 }
-                                if (unit.ILCode != null)
+                                else
                                 {
-                                    ilCode = ToIL(unit);
+                                    if (unit.DecompiledMethods != null)
+                                    {
+                                        asmCode = ToAsm(unit);
+                                    }
+                                    if (unit.ILCode != null)
+                                    {
+                                        ilCode = ToIL(unit);
+                                    }
+                                    File.WriteAllText(outAsmFile, asmCode);
+                                    File.WriteAllText(outILFile, ilCode);
                                 }
-                                File.WriteAllText(outAsmFile, asmCode);
-                                File.WriteAllText(outILFile, ilCode);
 
                             }
                         }
@@ -285,12 +301,26 @@ namespace PowerUp.Watcher
 
         public DecompilationUnit DecompileIL(string code)
         {
-            var unit = new DecompilationUnit();
-            var type = _iLCompiler.Compile(code);
-            var result = type.ToAsm(@private: true);
+            var decompilationUnit = new DecompilationUnit();
+            var compilationUnit   = _iLCompiler.Compile(code);
 
-            unit.DecompiledMethods = result;
-            return unit;
+            if (compilationUnit.Errors.Count > 0)
+            {
+                //
+                // Handle errors
+                //
+                decompilationUnit.Errors = compilationUnit.Errors.ToArray();
+            }
+            else
+            {
+                var result = compilationUnit
+                    .CompiledType
+                    .ToAsm(@private: true);
+                decompilationUnit.DecompiledMethods = result;
+
+            }
+
+            return decompilationUnit;
         }
 
         public DecompilationUnit Decompile(string code)

@@ -10,13 +10,18 @@ namespace PowerUp.Core.Compilation
 {
     public class ILCompiler
     {
-        public Type Compile(string il)
+        public ILCompilationUnit Compile(string il)
         {
             ILTokenizer tokenizer = new ILTokenizer();
             ILParser iLParser = new ILParser();
 
             var tokens = tokenizer.Tokenize(il);
             var root = iLParser.Parse(tokens);
+
+            if (root.Errors.Count > 0)
+            {
+                return new ILCompilationUnit() { Errors = root.Errors };
+            }
 
             var name = Guid.NewGuid().ToString();
             var asm  = AssemblyBuilder.DefineDynamicAssembly(
@@ -26,7 +31,7 @@ namespace PowerUp.Core.Compilation
             var module = asm.DefineDynamicModule(name);
             var type = module.DefineType("Compilation", TypeAttributes.Public | TypeAttributes.BeforeFieldInit);
 
-            foreach (var ilMethod in root.Methods)
+            foreach (var ilMethod in root.Classes.First().Methods)
             {
                 var returnType = StringToType(ilMethod.Returns);
                
@@ -47,19 +52,19 @@ namespace PowerUp.Core.Compilation
                 // Book keep the labels 
                 //
                 Label[] labels = new Label[ilMethod.Code.Count];
-                int index = 0;
+                int opCodeindex = 0;
 
                 foreach (var opCode in ilMethod.Code)
                 {
                     var label = default(Label);  
 
-                    if (labels[index] == default(Label))
+                    if (labels[opCodeindex] == default(Label))
                     {
                         label = ilGen.DefineLabel();
                     }
                     else
                     {
-                        label = labels[index];
+                        label = labels[opCodeindex];
                     }
 
                     ilGen.MarkLabel(label);
@@ -197,9 +202,8 @@ namespace PowerUp.Core.Compilation
                         // This needs better handling; we want to call methods we have defined in IL
                         // so to do this we first would need to figure out which one to emit first.
                         //
-                        case "call":
-                            break;
-                            //ilGen.Emit(OpCodes.Call, opCode.GetFirstArg()); break;
+                        case "call":     ilGen.Emit(OpCodes.Call,     CreateCall((ILCallInst)opCode)); break;
+                        case "callvirt": ilGen.Emit(OpCodes.Callvirt, CreateCall((ILCallInst)opCode)); break;
                         //
                         // Maths 
                         //
@@ -210,13 +214,36 @@ namespace PowerUp.Core.Compilation
                         case "ret":      ilGen.Emit(OpCodes.Ret); break;
                     }
 
-                    index++;
+                    opCodeindex++;
                 }
             }
-            
-            return type.CreateType();
+
+            return new ILCompilationUnit() { CompiledType = type.CreateType() };
         }
         
+        private MethodInfo CreateCall(ILCallInst callOpCode)
+        {
+            Type[] args = null;
+            if (callOpCode.Arguments == null || callOpCode.Arguments.Length == 0)
+            {
+                args = Type.EmptyTypes;
+            }
+            else
+            {
+                args = new Type[callOpCode.Arguments.Length];
+                var callArgIndex = 0;
+                foreach (var arg in callOpCode.Arguments)
+                {
+                    var argType = StringToType(arg);
+                    args[callArgIndex++] = argType;
+                }
+            }
+
+            var callType = StringToType(callOpCode.TypeName);
+            var callMethod = callType.GetMethod(callOpCode.MethodCallName, args);
+            return callMethod;
+        }
+
         private Label[] GetOrCreateLabels(ILGenerator ilGen, Label[] labels, ILInst opCode, ILMethod ilMethod)
         {
             Label[] labelsToReturn = new Label[opCode.Arguments.Length];
@@ -293,8 +320,11 @@ namespace PowerUp.Core.Compilation
                 //
                 case "int":
                 case "int32":  returnType = typeof(Int32);  break;
-                case "string": returnType = typeof(string); break;
-                case "object": returnType = typeof(object); break;
+                case "int64":  returnType = typeof(Int64); break;
+                case "char":   returnType = typeof(Char);   break;
+                case "string": returnType = typeof(String); break;
+                case "object": returnType = typeof(Object); break;
+
                 default:       returnType = Type.GetType(typeInfo); break;
             }
 

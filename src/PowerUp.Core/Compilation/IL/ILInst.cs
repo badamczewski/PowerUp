@@ -15,4 +15,10 @@
             return null;
         }
     }
+
+    public class ILCallInst : ILInst
+    {
+        public string TypeName { get; set; }
+        public string MethodCallName { get; set; }
+    }
 }
