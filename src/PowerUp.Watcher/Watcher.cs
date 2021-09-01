@@ -20,13 +20,16 @@ using PowerUp.Core.Compilation;
 
 namespace PowerUp.Watcher
 {
+
     public class Watcher
     {
-        private CodeCompiler _compiler = new CodeCompiler();
+        private CodeCompiler _compiler     = new CodeCompiler();
         private ILDecompiler _iLDecompiler = new ILDecompiler();
+        private ILCompiler   _iLCompiler   = new ILCompiler();
 
-        public Task WatchFile(string file, string outAsmFile, string outILFile)
+        public Task WatchFile(string csharpFile, string outAsmFile, string outILFile)
         {
+        
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
             var t = Task.Run(async () => {
@@ -35,13 +38,19 @@ namespace PowerUp.Watcher
                 {
                     try
                     {
-                        FileInfo fileInfo = new FileInfo(file);
+                        FileInfo fileInfo = new FileInfo(csharpFile);
                         if (fileInfo.LastWriteTime > lastWrite)
                         {
-                            var code = File.ReadAllText(file);
+                            var code = File.ReadAllText(csharpFile);
                             if (string.IsNullOrEmpty(code) == false && lastCode != code)
                             {
-                                var unit = Decompile(code);
+                                DecompilationUnit unit = null;
+
+                                if (fileInfo.Extension == ".il")
+                                    unit = DecompileIL(code);
+                                else
+                                    unit = Decompile(code);
+
                                 lastWrite = fileInfo.LastWriteTime;
                                 lastCode = code;
 
@@ -52,17 +61,24 @@ namespace PowerUp.Watcher
                                 {
                                     asmCode = ToAsm(unit);
                                 }
-                                if(unit.ILCode != null)
+                                if (unit.ILCode != null)
                                 {
                                     ilCode = ToIL(unit);
                                 }
                                 File.WriteAllText(outAsmFile, asmCode);
-                                File.WriteAllText(outILFile,  ilCode);
+                                File.WriteAllText(outILFile, ilCode);
 
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        //
+                        // Report this back to the out files.
+                        //
+                        File.WriteAllText(outAsmFile, ex.ToString());
+                        File.WriteAllText(outILFile,  ex.ToString());
+                    }
 
                     await Task.Delay(500);
                 }  
@@ -265,6 +281,16 @@ namespace PowerUp.Watcher
             }
 
             return builder.ToString();
+        }
+
+        public DecompilationUnit DecompileIL(string code)
+        {
+            var unit = new DecompilationUnit();
+            var type = _iLCompiler.Compile(code);
+            var result = type.ToAsm(@private: true);
+
+            unit.DecompiledMethods = result;
+            return unit;
         }
 
         public DecompilationUnit Decompile(string code)

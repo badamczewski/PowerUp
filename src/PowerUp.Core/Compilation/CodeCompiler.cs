@@ -16,7 +16,7 @@ namespace PowerUp.Core.Compilation
     {
         private string _dotNetCoreDirPath = null;
 
-        public CodeCompiler(string dotNetCoreDirPath = @"C:\Program Files\dotnet\shared\Microsoft.NETCore.App\5.0.0\")
+        public CodeCompiler(string dotNetCoreDirPath = @"C:\Program Files\dotnet\shared\Microsoft.NETCore.App\6.0.0-preview.7.21377.19\")
         {
             _dotNetCoreDirPath = dotNetCoreDirPath;
         }

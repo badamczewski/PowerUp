@@ -23,8 +23,12 @@ namespace PowerUp.Core.Decompilation
                 var clrVersion = dataTarget.ClrVersions.First();
                 var runtime = clrVersion.CreateRuntime();
 
+                //
                 // Attempt to make ClrMd aware of recent jitting:
-                // https://github.com/microsoft/clrmd/issues/303
+                //
+                // @NOTE: Not sure if this is needed any longer but it doesn't matter for us here.
+                // Link: https://github.com/microsoft/clrmd/issues/303
+                //
                 dataTarget.DataReader.Flush();
 
                 var topLevelDelegateAddress = GetMethodAddress(runtime, method);
@@ -51,7 +55,7 @@ namespace PowerUp.Core.Decompilation
             var clrmdMethodHandle = runtime.GetMethodByHandle((ulong)method.MethodHandle.Value.ToInt64());
             if (clrmdMethodHandle.NativeCode == 0) throw new InvalidOperationException($"Unable to disassemble method `{method}`");
 
-            var codePtr = clrmdMethodHandle.HotColdInfo.HotStart;
+            var codePtr  = clrmdMethodHandle.HotColdInfo.HotStart;
             var codeSize = clrmdMethodHandle.HotColdInfo.HotSize;
 
             return (codePtr, codeSize);
@@ -66,10 +70,13 @@ namespace PowerUp.Core.Decompilation
                 var clrVersion = dataTarget.ClrVersions.First();
                 var runtime = clrVersion.CreateRuntime();
 
+                //
                 // Attempt to make ClrMd aware of recent jitting:
-                // https://github.com/microsoft/clrmd/issues/303
+                //
+                // @NOTE: Not sure if this is needed any longer but it doesn't matter for us here.
+                // Link: https://github.com/microsoft/clrmd/issues/303
+                //
                 dataTarget.DataReader.Flush();
-
                 return DecompileMethod(runtime, codePtr, codeSize, name);
             }
         }
@@ -141,7 +148,6 @@ namespace PowerUp.Core.Decompilation
                         if(value.StartsWith("[") && value.EndsWith("]"))
                         {
                             isAddressing = true;
-                            //value = value.Substring(1, value.Length - 2);
                         }
 
                         assemblyInstruction.Arguments[i] = new InstructionArg()
@@ -189,6 +195,8 @@ namespace PowerUp.Core.Decompilation
                         refAddress = instruction.NearBranchTarget;
                         isAddressOk = refAddress > ushort.MaxValue;
                         break;
+                    case OpKind.Immediate16:
+                    case OpKind.Immediate32:
                     case OpKind.Immediate64:
                         refAddress = instruction.GetImmediate(i);
                         isAddressOk = refAddress > ushort.MaxValue;
@@ -197,13 +205,17 @@ namespace PowerUp.Core.Decompilation
                         refAddress = instruction.MemoryAddress64;
                         isAddressOk = refAddress > ushort.MaxValue;
                         break;
-                    case OpKind.Memory when instruction.IsIPRelativeMemoryOperand:
-                        refAddress = instruction.IPRelativeMemoryAddress;
-                        isAddressOk = refAddress > ushort.MaxValue;
-                        break;
                     case OpKind.Memory:
-                        refAddress = instruction.MemoryDisplacement;
-                        isAddressOk = refAddress > ushort.MaxValue;
+                        if (instruction.IsIPRelativeMemoryOperand)
+                        {
+                            refAddress = instruction.IPRelativeMemoryAddress;
+                            isAddressOk = refAddress > ushort.MaxValue;
+                        }
+                        else
+                        {
+                            refAddress = instruction.MemoryDisplacement;
+                            isAddressOk = refAddress > ushort.MaxValue;
+                        }
                         break;
                 }
             }
