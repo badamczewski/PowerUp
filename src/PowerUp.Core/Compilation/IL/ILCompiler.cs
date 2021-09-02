@@ -42,11 +42,22 @@ namespace PowerUp.Core.Compilation
                     argTypes[idx++] = StringToType(arg.Type);
                 }
 
-                MethodAttributes accessorAttribute = MethodAttributes.Public;
-                if (ilMethod.Accessor == "private") accessorAttribute = MethodAttributes.Private;
+                int indexOffset = 1;
+                MethodAttributes attributes = MethodAttributes.Public;
+                if (ilMethod.Accessor == "private")
+                {
+                    attributes = MethodAttributes.Private;
+                }
 
-                var method = type.DefineMethod(ilMethod.Name, accessorAttribute | MethodAttributes.HideBySig, returnType, argTypes);
+                if (ilMethod.InstanceType == "static")
+                {
+                    attributes |= MethodAttributes.Static;
+                    indexOffset = 0;
+                }
+
+                var method = type.DefineMethod(ilMethod.Name, attributes | MethodAttributes.HideBySig, returnType, argTypes);
                 var ilGen  = method.GetILGenerator();
+
 
                 //
                 // Book keep the labels 
@@ -90,8 +101,10 @@ namespace PowerUp.Core.Compilation
                         case "ldarg.1":  ilGen.Emit(OpCodes.Ldarg_1);  break;
                         case "ldarg.2":  ilGen.Emit(OpCodes.Ldarg_2);  break;
                         case "ldarg.3":  ilGen.Emit(OpCodes.Ldarg_3);  break;
-                        case "ldarg.s":  ilGen.Emit(OpCodes.Ldarg_S,   FindArgIndex(opCode.GetFirstArg(), ilMethod)); break;
-                        case "ldarga.s": ilGen.Emit(OpCodes.Ldarga_S,  FindArgIndex(opCode.GetFirstArg(), ilMethod)); break;
+                        case "ldarg.s":  ilGen.Emit(OpCodes.Ldarg_S,   FindArgIndex(opCode.GetFirstArg(), ilMethod, indexOffset)); break;
+                        case "ldarga.s": ilGen.Emit(OpCodes.Ldarga_S,  FindArgIndex(opCode.GetFirstArg(), ilMethod, indexOffset)); break;
+                        case "starg.s":  ilGen.Emit(OpCodes.Starg_S,   FindArgIndex(opCode.GetFirstArg(), ilMethod, indexOffset)); break;
+                        case "starg":    ilGen.Emit(OpCodes.Starg,     FindArgIndex(opCode.GetFirstArg(), ilMethod, indexOffset)); break;
 
                         //
                         // Stringsssss
@@ -291,9 +304,9 @@ namespace PowerUp.Core.Compilation
             return -1;
         }
 
-        private int FindArgIndex(string name, ILMethod method)
+        private int FindArgIndex(string name, ILMethod method, int offset)
         {
-            int idx = 0;
+            int idx = offset;
             foreach(var arg in method.Args)
             {
                 if (arg.Name == name)

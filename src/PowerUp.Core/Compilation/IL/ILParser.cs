@@ -63,8 +63,20 @@ namespace PowerUp.Core.Compilation
             // Parse Accessor + HideBySig + Instance
             //
             var accessorToken = Consume();
-            var sigToken      = Consume();
-            var instanceToken = Consume();
+            var maybeSigToken = Consume();
+
+            if(maybeSigToken.GetValue() == "hidebysig")
+            {
+                var instanceToken   = Consume();
+                method.InstanceType = instanceToken.GetValue();
+            }
+            //
+            // Signature was empty it must be something else.
+            //
+            else
+            {
+                method.InstanceType = maybeSigToken.GetValue();
+            }
 
             method.Accessor = accessorToken.GetValue();
 
@@ -224,7 +236,7 @@ namespace PowerUp.Core.Compilation
                         {
                             instructionToken = Consume();
 
-                            if (instructionToken.Is(ILTokenKind.LIndex))
+                            if (Find(ILTokenKind.LIndex))
                             {
                                 if (Find(ILTokenKind.RIndex))
                                 {
