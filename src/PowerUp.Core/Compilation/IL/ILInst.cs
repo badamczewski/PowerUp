@@ -20,5 +20,6 @@
     {
         public string TypeName { get; set; }
         public string MethodCallName { get; set; }
+        public string AssemblyName { get; set; }
     }
 }

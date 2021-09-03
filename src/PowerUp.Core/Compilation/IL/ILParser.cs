@@ -189,11 +189,11 @@ namespace PowerUp.Core.Compilation
                             instructionToken = Consume();
                             ilInstruction.Arguments = new[] { instructionToken.GetValue() };
                         }
-                        //
-                        // @TODO: Report Error.
-                        //
-                        Error("Found an opening bracket, but the instruction is missing the closing bracket");
-                        return method;
+                        else
+                        {
+                            Error("Found an opening bracket, but the instruction is missing the closing bracket");
+                            return method;
+                        }
                     }
                     //
                     // Arg List
@@ -234,54 +234,68 @@ namespace PowerUp.Core.Compilation
 
                         for (; IP < tokens.Count;)
                         {
-                            instructionToken = Consume();
+                            //
+                            // This should be a return type or "instance" followed by return type.
+                            //
+                            if (instructionToken.GetValue() == "instance")
+                                Consume(); //Move to return type.
 
-                            if (Find(ILTokenKind.LIndex))
+                            //
+                            // I don't know what the spec does say about the dll import name
+                            // but I will make this optional since for most things this will not be needed.
+                            //
+                            if (PeekFind(ILTokenKind.LIndex))
                             {
-                                if (Find(ILTokenKind.RIndex))
+                                //
+                                // Fetch the assembly name (This is handly to create a fully specified name when fetching the type).
+                                //
+                                instructionToken = Consume();
+                                ((ILCallInst)ilInstruction).AssemblyName = instructionToken.GetValue();
+
+                                if (PeekFind(ILTokenKind.RIndex) == false)
                                 {
-                                    //
-                                    // This should be our method call.
-                                    //
-                                    instructionToken = Consume();
-                                    var typeAndCall = instructionToken.GetValue();
-                                    var typeAndCallPair = typeAndCall.Split("::");
-
-                                    ((ILCallInst)ilInstruction).TypeName = typeAndCallPair[0];
-                                    ((ILCallInst)ilInstruction).MethodCallName = typeAndCallPair[1];
-
-                                    instructionToken = Consume();
-                                    if (instructionToken.Is(ILTokenKind.LParen))
-                                    {
-                                        //
-                                        // Parse method arguments;
-                                        //
-                                        for (; IP < tokens.Count;)
-                                        {
-                                            instructionToken = Consume();
-
-                                            if (instructionToken.Is(ILTokenKind.RParen)) break;
-
-                                            methodCallArgs.Add(instructionToken.GetValue());
-
-                                            var possibleCommaOrEnd = Peek();
-                                            if (possibleCommaOrEnd.Is(ILTokenKind.Comma))
-                                            {
-                                                Consume();
-                                                continue;
-                                            }
-                                            else if (possibleCommaOrEnd.Is(ILTokenKind.RParen))
-                                            {
-                                                Consume();
-                                                break;
-                                            }
-                                        }
-                                        break;
-                                    }
-
                                     Error("Found an opening bracket in the argument list, but the closing bracket is missing");
                                     return method;
                                 }
+                            }
+                            //
+                            // This should be our method call.
+                            //
+                            instructionToken = Consume();
+
+                            var typeAndCall = instructionToken.GetValue();
+                            var typeAndCallPair = typeAndCall.Split("::");
+
+                            ((ILCallInst)ilInstruction).TypeName = typeAndCallPair[0];
+                            ((ILCallInst)ilInstruction).MethodCallName = typeAndCallPair[1];
+
+                            instructionToken = Consume();
+                            if (instructionToken.Is(ILTokenKind.LParen))
+                            {
+                                //
+                                // Parse method arguments;
+                                //
+                                for (; IP < tokens.Count;)
+                                {
+                                    instructionToken = Consume();
+
+                                    if (instructionToken.Is(ILTokenKind.RParen)) break;
+
+                                    methodCallArgs.Add(instructionToken.GetValue());
+
+                                    var possibleCommaOrEnd = Peek();
+                                    if (possibleCommaOrEnd.Is(ILTokenKind.Comma))
+                                    {
+                                        Consume();
+                                        continue;
+                                    }
+                                    else if (possibleCommaOrEnd.Is(ILTokenKind.RParen))
+                                    {
+                                        Consume();
+                                        break;
+                                    }
+                                }
+                                break;
                             }
 
                             Error("Found an opening bracket, but the instruction is missing the closing bracket");
@@ -313,6 +327,21 @@ namespace PowerUp.Core.Compilation
             for (; IP < tokens.Count; IP++)
                 if (tokens[IP].Kind == kind)
                     return true;
+
+            return false;
+        }
+
+        private bool PeekFind(ILTokenKind kind)
+        {
+            int ip = IP;
+            for (; ip < tokens.Count; ip++)
+            {
+                if (tokens[ip].Kind == kind)
+                {
+                    IP = ip;
+                    return true;
+                }
+            }
 
             return false;
         }
@@ -362,6 +391,10 @@ namespace PowerUp.Core.Compilation
         }
 
 
+        //
+        // This method will create all of the needed information about the error
+        // we just need to provide a good message and decide if we return or continue going.
+        //
         private void Error(string message) 
         {
             //
@@ -381,7 +414,10 @@ namespace PowerUp.Core.Compilation
                 position = currentToken.Position;
             }
 
-            errors.Add(new Error() { Trace = enviroment.Name, Position = position, Message = $"[PARSING ERROR]{Environment.NewLine}{message}" });
+            errors.Add(new Error() { 
+                Trace = enviroment.Name, 
+                Position = position, 
+                Message = $"[PARSING ERROR]{Environment.NewLine}{message}" });
         }
     }
 }

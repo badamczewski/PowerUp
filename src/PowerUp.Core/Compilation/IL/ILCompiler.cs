@@ -252,7 +252,10 @@ namespace PowerUp.Core.Compilation
                 }
             }
 
-            var callType = StringToType(callOpCode.TypeName);
+            //
+            // Create a fully qualified type.
+            //
+            var callType = Type.GetType($"{callOpCode.TypeName},{callOpCode.AssemblyName}");
             var callMethod = callType.GetMethod(callOpCode.MethodCallName, args);
             return callMethod;
         }
