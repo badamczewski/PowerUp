@@ -11,6 +11,7 @@ namespace PowerUp.Core.Compilation
 {
     public class CompilationUnit
     {
+        public string SourceCode { get; set; }
         public MemoryStream AssemblyStream { get; set; }
         public MemoryStream PDBStream { get; set; }
         public EmitResult CompilationResult { get; set; }

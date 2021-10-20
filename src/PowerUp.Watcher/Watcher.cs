@@ -18,19 +18,48 @@ using PowerUp.Core.Decompilation;
 using System.Threading.Tasks;
 using PowerUp.Core.Compilation;
 using PowerUp.Core.Errors;
+using System.Linq;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using BenchmarkDotNet.Reports;
+using Microsoft.Extensions.Configuration;
 
 namespace PowerUp.Watcher
 {
-
     public class Watcher
     {
-        private CodeCompiler _compiler     = new CodeCompiler();
+        private IConfigurationRoot _configuration;
+
+        private CodeCompiler _compiler     = null;
         private ILDecompiler _iLDecompiler = new ILDecompiler();
         private ILCompiler   _iLCompiler   = new ILCompiler();
 
+        public Watcher(IConfigurationRoot configuration)
+        {
+            _configuration = configuration;
+        }
+
+        private void InitializeCsharpCompiler()
+        {
+            if (Environment.Version.Major == 5)
+            {
+                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathNet5"]);
+            }
+            else if (Environment.Version.Major == 6)
+            {
+                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathNet6"]);
+            }
+            else
+            {
+                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathDefault"]);
+            }
+        }
+
         public Task WatchFile(string csharpFile, string outAsmFile, string outILFile)
         {
-        
+            InitializeCsharpCompiler();
+
+            Console.WriteLine($"Libs Path: {_compiler.DotNetCoreDirPath}");
+
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
             var t = Task.Run(async () => {
@@ -46,11 +75,16 @@ namespace PowerUp.Watcher
                             if (string.IsNullOrEmpty(code) == false && lastCode != code)
                             {
                                 DecompilationUnit unit = null;
+                                var compilation = _compiler.Compile(code);
 
                                 if (fileInfo.Extension == ".il")
+                                {
                                     unit = DecompileIL(code);
+                                }
                                 else
+                                {
                                     unit = Decompile(code);
+                                }
 
                                 lastWrite = fileInfo.LastWriteTime;
                                 lastCode = code;
@@ -80,6 +114,14 @@ namespace PowerUp.Watcher
                                     {
                                         ilCode = ToIL(unit);
                                     }
+
+                                    if(unit.Messages != null)
+                                    {
+                                        asmCode += 
+                                            Environment.NewLine + 
+                                            string.Join(Environment.NewLine, unit.Messages);
+                                    }
+
                                     File.WriteAllText(outAsmFile, asmCode);
                                     File.WriteAllText(outILFile, ilCode);
                                 }
@@ -195,6 +237,8 @@ namespace PowerUp.Watcher
 
             foreach(var method in unit.DecompiledMethods)
             {
+                if (method == null) continue;
+
                 builder.Append($"{method.Return} {method.Name}(");
 
                 for (int i = 0; i < method.Arguments.Length; i++)
@@ -347,20 +391,74 @@ namespace PowerUp.Watcher
                 }
                 else
                 {
+
                     assemblyStream.Position = 0;
                     var loaded = ctx.LoadFromStream(assemblyStream);
-                    var result = loaded.GetType("CompilerGen").ToAsm(@private: true);
+                    var compiledType = loaded.GetType("CompilerGen");
+                    var decompiledMethods = compiledType.ToAsm(@private: true);
+                    var messages = RunPostCompilationOperations(loaded, compiledType);
+                    HideDecompiledMethods(decompiledMethods);
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
 
                     ILDecompiler iLDecompiler = new ILDecompiler();
                     unit.ILCode = iLDecompiler.ToIL(assemblyStream, pdbStream);
-                    unit.DecompiledMethods = result;
+                    unit.DecompiledMethods = decompiledMethods;
+                    unit.Messages = messages.ToArray();
                 }
 
                 return unit;
             }
+        }
+
+        private void HideDecompiledMethods(DecompiledMethod[] methods)
+        {
+            //
+            // Null the benchmark method so it's not displayed.
+            //
+            for (int i = 0; i < methods.Length; i++)
+            {
+                if (methods[i].Name.StartsWith("Bench_")) methods[i] = null;
+                else if (methods[i].Name == "Print")      methods[i] = null;
+            }
+        }
+
+        private List<string> RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType)
+        {
+            List<string> messages = new List<string>();
+
+            var compiledLog = loadedAssembly.GetType("_Log");
+            var instance = loadedAssembly.CreateInstance("CompilerGen");
+            var methods = compiledType.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+            foreach (var method in methods)
+            {
+                if (method.Name.StartsWith("Bench_"))
+                {
+                    var summary = (long)method.Invoke(instance, null);
+
+                    var methodUnderBenchmarkName = method.Name.Split("_")[1];
+
+                    messages.Add("# ");
+                    messages.Add($"# Method: {methodUnderBenchmarkName}");
+                    messages.Add("# Warm-up Count: 1000 calls");
+                    messages.Add($"# Took {summary} ms / 1000 calls");
+                    messages.Add("# ");
+                }
+                else
+                {
+                    var attributes = method.GetCustomAttributes();
+
+                    if (attributes.FirstOrDefault(x => x.GetType().Name == "RunAttribute") != null)
+                    {
+                        method.Invoke(instance, null);
+                        var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
+                        messages.AddRange(log);
+                    }
+                }
+            }
+
+            return messages;
         }
     }
 }

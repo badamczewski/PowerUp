@@ -6,11 +6,13 @@ using System.Text;
 
 namespace PowerUp.Core.Decompilation
 {
+
     public class DecompilationUnit
     {
         public Error[] Errors { get; set; }  = Array.Empty<Error>();
         public DecompiledMethod[] DecompiledMethods { get; set; }
         public ILToken[] ILCode { get; set; }
+        public string[] Messages { get; set; } = Array.Empty<string>();
     }
 
     public enum ILTokenType
@@ -42,7 +44,6 @@ namespace PowerUp.Core.Decompilation
     public class DecompiledMethod
     {
         public string Name { get; set; }
-
         public string Return { get; set; }
         public string[] Arguments { get; set; }
 
