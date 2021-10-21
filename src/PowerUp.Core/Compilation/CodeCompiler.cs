@@ -135,6 +135,8 @@ namespace PowerUp.Core.Compilation
                     using System.Collections.Generic;
                     using System.Collections;
                     using System.Linq.Expressions;
+                    using System.Runtime.InteropServices;
+
 
                     [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                     sealed class BenchAttribute : Attribute

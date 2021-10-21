@@ -69,11 +69,13 @@ namespace PowerUp.Watcher
                     try
                     {
                         FileInfo fileInfo = new FileInfo(csharpFile);
-                        if (fileInfo.LastWriteTime > lastWrite)
+                        if (fileInfo.LastWriteTime.Ticks > lastWrite.Ticks)
                         {
                             var code = File.ReadAllText(csharpFile);
                             if (string.IsNullOrEmpty(code) == false && lastCode != code)
                             {
+                                Console.WriteLine("Decompiling ...");
+
                                 DecompilationUnit unit = null;
                                 var compilation = _compiler.Compile(code);
 
