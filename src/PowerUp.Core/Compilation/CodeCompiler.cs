@@ -19,15 +19,16 @@ namespace PowerUp.Core.Compilation
     public class CodeCompiler
     {
         public string DotNetCoreDirPath { get; private set; }
+        public LanguageVersion LanguageVersion { get; private set; }
 
-        public CodeCompiler(string dotNetCoreDirPath)
+        public CodeCompiler(string dotNetCoreDirPath, LanguageVersion languageVersion = LanguageVersion.Latest)
         {
             DotNetCoreDirPath = dotNetCoreDirPath;
+            LanguageVersion = languageVersion;
         }
 
         public CompilationUnit Compile(string code)
         {
-
             var sourceCode = RewriteCode(code);
 
             var compilation = CSharpCompilation.Create("assembly")
@@ -35,6 +36,7 @@ namespace PowerUp.Core.Compilation
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                     .WithOptimizationLevel(OptimizationLevel.Release)
                     .WithAllowUnsafe(true)
+                   
             )
             .AddReferences(
                 MetadataReference.CreateFromFile(typeof(object).GetTypeInfo().Assembly.Location),
@@ -43,9 +45,11 @@ namespace PowerUp.Core.Compilation
                 MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "netstandard.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Runtime.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Linq.dll")),
-                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Linq.Expressions.dll"))
+                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Linq.Expressions.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Runtime.CompilerServices.Unsafe.dll"))
                 )
-            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(sourceCode));
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(sourceCode, 
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion)));
 
             EmitOptions emitOptions = new EmitOptions(debugInformationFormat: DebugInformationFormat.PortablePdb);
             DecompilationUnit unit = new DecompilationUnit();
@@ -59,7 +63,8 @@ namespace PowerUp.Core.Compilation
                 SourceCode = sourceCode,
                 AssemblyStream = assemblyStream,
                 PDBStream = pdbStream,
-                CompilationResult = compilationResult
+                CompilationResult = compilationResult,
+                LanguageVersion = compilation.LanguageVersion.ToDisplayString()
             };
         }
 
@@ -71,6 +76,7 @@ namespace PowerUp.Core.Compilation
         {
             var benchCode = "";
             code = code.Replace("[NoInline]", "[MethodImpl(MethodImplOptions.NoInlining)]");
+            code = code.Replace("[Inline]",   "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
 
             var ast = CSharpSyntaxTree.ParseText(code);
             var root = ast.GetRoot();

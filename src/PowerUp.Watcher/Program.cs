@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using PowerUp.Core.Console;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,29 +11,16 @@ namespace PowerUp.Watcher
 {
     class Program
     {
-
-        public static bool IsDebug
-        {
-            get
-            {
-#if DEBUG
-            return true;
-#else
-                return false;
-#endif
-            }
-        }
-
         static void Main(string[] args)
         {
-            Console.WriteLine(".NET {0}", Environment.Version.ToString());
-            Console.WriteLine(IsDebug ? "[DEBUG]" : "[RELEASE]");
+            XConsole.WriteLine("\r\n=== PowerUP Watcher. ===\r\n");
 
             if (args.Length != 3)
             {
-                Console.WriteLine("arg1 = Path to C#  file");
-                Console.WriteLine("arg2 = Path to ASM file");
-                Console.WriteLine("arg3 = Path to IL  file");
+                XConsole.WriteLine("Missing Arguments:");
+                XConsole.WriteLine(" 'arg1' = Path to C#  file");
+                XConsole.WriteLine(" 'arg2' = Path to ASM file");
+                XConsole.WriteLine(" 'arg3' = Path to IL  file");
                 return;
             }
 
@@ -48,5 +36,6 @@ namespace PowerUp.Watcher
                 args[2]);
             t.Wait();
         }
+
     }
 }

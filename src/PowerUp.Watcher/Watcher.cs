@@ -22,6 +22,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using BenchmarkDotNet.Reports;
 using Microsoft.Extensions.Configuration;
+using PowerUp.Core.Console;
 
 namespace PowerUp.Watcher
 {
@@ -33,11 +34,36 @@ namespace PowerUp.Watcher
         private ILDecompiler _iLDecompiler = new ILDecompiler();
         private ILCompiler   _iLCompiler   = new ILCompiler();
 
+        public static bool IsDebug
+        {
+            get
+            {
+                #if DEBUG
+                return true;
+                #else
+                return false;
+                #endif
+            }
+        }
         public Watcher(IConfigurationRoot configuration)
         {
             _configuration = configuration;
         }
 
+        private void Initialize(string csharpFile, string outAsmFile, string outILFile)
+        {
+            InitializeCsharpCompiler();
+
+            XConsole.WriteLine($"`Input File`: {csharpFile}");
+            XConsole.WriteLine($"`ASM   File`: {outAsmFile}");
+            XConsole.WriteLine($"`IL    File`: {outILFile}");
+
+
+            XConsole.WriteLine($"`Libs  Path`: {_compiler.DotNetCoreDirPath}");
+            XConsole.WriteLine($"`Language  Version`: {_compiler.LanguageVersion.ToDisplayString()}");
+            XConsole.WriteLine($"`.NET Version`: {Environment.Version.ToString()}");
+            XConsole.WriteLine(IsDebug ? "'[DEBUG]'" : "`[RELEASE]`");
+        }
         private void InitializeCsharpCompiler()
         {
             if (Environment.Version.Major == 5)
@@ -46,19 +72,19 @@ namespace PowerUp.Watcher
             }
             else if (Environment.Version.Major == 6)
             {
-                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathNet6"]);
+                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathNet6"], LanguageVersion.Default);
             }
+
             else
             {
                 _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathDefault"]);
             }
         }
 
+
         public Task WatchFile(string csharpFile, string outAsmFile, string outILFile)
         {
-            InitializeCsharpCompiler();
-
-            Console.WriteLine($"Libs Path: {_compiler.DotNetCoreDirPath}");
+            Initialize(csharpFile, outAsmFile, outILFile);
 
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
@@ -74,10 +100,10 @@ namespace PowerUp.Watcher
                             var code = File.ReadAllText(csharpFile);
                             if (string.IsNullOrEmpty(code) == false && lastCode != code)
                             {
-                                Console.WriteLine("Decompiling ...");
-
                                 DecompilationUnit unit = null;
                                 var compilation = _compiler.Compile(code);
+
+                                XConsole.WriteLine($"Decompiling: {csharpFile}");
 
                                 if (fileInfo.Extension == ".il")
                                 {
@@ -377,6 +403,8 @@ namespace PowerUp.Watcher
             var compilationResult = compilation.CompilationResult;
             var assemblyStream = compilation.AssemblyStream;
             var pdbStream = compilation.PDBStream;
+
+            XConsole.WriteLine(compilation.LanguageVersion);
 
             using (var ctx = new CustomAssemblyLoadContext())
             {
