@@ -23,6 +23,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using BenchmarkDotNet.Reports;
 using Microsoft.Extensions.Configuration;
 using PowerUp.Core.Console;
+using static PowerUp.Core.Console.XConsole;
 
 namespace PowerUp.Watcher
 {
@@ -143,6 +144,9 @@ namespace PowerUp.Watcher
                                         ilCode = ToIL(unit);
                                     }
 
+                                    //
+                                    // Pring Global Messages.
+                                    //
                                     if(unit.Messages != null)
                                     {
                                         asmCode += 
@@ -258,6 +262,231 @@ namespace PowerUp.Watcher
             return builder.ToString();
         }
 
+        //
+        // This section describes guides drawing.
+        //
+        // When presented with the following code:
+        //
+        // 001: A
+        // 002: JMP 005
+        // 003: B
+        // 004: JMP 005
+        // 005: C
+        // 006: D
+        // 007: JMP 001
+        //
+        // We need to produce the following guides:
+        //
+        // ┌001: A
+        // │┌002: JMP 005
+        // ││003: B
+        // ││┌004: JMP 005
+        // │└└005: C
+        // │006: D
+        // └007: JMP 001
+        //
+        // To make this plesant to look at the longest jumps should be the most outer ones.
+        // 1. We need to figure out the direction of each jump, and see if the jump is inside our method.
+        // 2. We need to compute the lenght of each jump.
+        // 3. We then sort the jump table by the longest length
+        // 4. We draw the guides.
+        //
+        // Since we're writing out one instruction at a time from top to bottom we will need an additional piece of information
+        // on the instruction or as a lookup table that will tell us if we should draw a line segment(s), for example:
+        // When we are writing out 005: C we need to lookup the guides table that will contain:
+        //   005 =>
+        //      [0] = |
+        //      [1] = └
+        //      [2] = └
+        // 
+        private (int jumpSize, int nestingLevel) PopulateGuides(DecompiledMethod method)
+        {
+            if (method == null) return (0, 0);
+
+            var methodAddress = method.CodeAddress;
+            var codeSize = method.CodeSize;
+            int jumps    = 0;
+
+            foreach (var instruction in method.Instructions)
+            {
+                foreach (var arg in instruction.Arguments)
+                {
+                    if (arg.HasReferenceAddress && instruction.RefAddress > 0)
+                    {
+                        instruction.jumpDirection = JumpDirection.Out;
+                        if (instruction.RefAddress >= methodAddress && instruction.RefAddress <= methodAddress + codeSize)
+                        {
+                            jumps++;
+                            //
+                            //  Jump Up
+                            //
+                            instruction.jumpDirection = JumpDirection.Up;
+                            if (instruction.Address < instruction.RefAddress)
+                            {
+                                //
+                                // Jump Down
+                                //
+                                instruction.jumpDirection = JumpDirection.Down;
+                            }
+                            //
+                            // Find the instruction and relative distance
+                            //
+                            foreach(var jmpTo in method.Instructions)
+                            {
+                                if(instruction.RefAddress == jmpTo.Address)
+                                {
+                                    //Found.
+                                    instruction.JumpIndex = jmpTo.OrdinalIndex;
+                                    instruction.JumpSize = Math.Abs(instruction.OrdinalIndex - jmpTo.OrdinalIndex);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            //
+            // Most outer instruction -> most inner instruction
+            //
+            int index = 0;
+            int maxJmpSize = -1;
+
+            var orderedInstructions = method.Instructions.OrderByDescending(x => x.JumpSize).ToArray();
+            maxJmpSize = orderedInstructions[0].JumpSize;
+
+            foreach (var orderedInstruction in orderedInstructions)
+            {
+                if (orderedInstruction.jumpDirection == JumpDirection.Out || orderedInstruction.jumpDirection == JumpDirection.None)
+                    continue;
+
+                var inst = method.Instructions[orderedInstruction.OrdinalIndex];
+
+                if (inst.jumpDirection == JumpDirection.Down)
+                {
+                    PopulateGuidesForDownJump(inst, method, jumps, index);
+                }
+                else if (inst.jumpDirection == JumpDirection.Up)
+                {
+                    PopulateGuidesForUpJump(inst, method, jumps, index);
+                }
+
+                index += 2;
+            }
+
+            return (maxJmpSize, index);
+        }
+
+        private void PopulateGuidesForDownJump(AssemblyInstruction inst, DecompiledMethod method, int methodJumpCount, int nestingIndex)
+        {
+            //
+            // What is our maximum nesting level for this jump.
+            //
+            var level = 2 * methodJumpCount - nestingIndex;
+
+            //
+            // Generate starting guides 
+            //
+            inst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.TopLeft;
+            for (int i = 1; i < level - 1; i++)
+                inst.GuideBlocks[nestingIndex + i] = ConsoleBorderStyle.TopBottom;
+
+            inst.GuideBlocks[nestingIndex + level - 1] = ConsoleBorderStyle.Bullet;
+
+
+            for (int i = 1; i < inst.JumpSize; i++)
+            {
+                var nestedInst = method.Instructions[inst.OrdinalIndex + i];
+
+                //
+                // Check prev guide and if the guide is TopBotom char then 
+                // we change our guide to a plus.
+                //
+                if (nestingIndex > 0 && nestedInst.GuideBlocks[nestingIndex - 1] == ConsoleBorderStyle.TopBottom)
+                    nestedInst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.SeparatorBoth;
+                else
+                    nestedInst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.Left;
+
+                //
+                // Populate everything down with whitespace.
+                //
+                for (int l = 1; l < level; l++)
+                {
+                    if (nestedInst.GuideBlocks[nestingIndex + l] == '\0')
+                        nestedInst.GuideBlocks[nestingIndex + l] = ' ';
+                }
+            }
+
+            //
+            // Get last instruction to set the arrow.
+            //
+            var lastInst = method.Instructions[inst.OrdinalIndex + inst.JumpSize];
+            //
+            // If guide above me is TopBotom then change it to arrow since, we are ending a jump here;
+            // So someone jumps here as well.
+            //
+            if (nestingIndex > 0 && lastInst.GuideBlocks[nestingIndex - 1] == ConsoleBorderStyle.TopBottom)
+                lastInst.GuideBlocks[nestingIndex - 1] = '>';
+
+            //
+            // Generate ending guides 
+            //
+            lastInst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.BottomLeft;
+            for (int i = 1; i < level - 1; i++)
+                lastInst.GuideBlocks[nestingIndex + i] = ConsoleBorderStyle.TopBottom;
+
+            lastInst.GuideBlocks[nestingIndex + level - 1] = '>';
+        }
+        private void PopulateGuidesForUpJump(AssemblyInstruction inst, DecompiledMethod method, int methodJumpCount, int nestingIndex)
+        {
+            //
+            // What is our maximum nesting level for this jump.
+            //
+            var level = 2 * methodJumpCount - nestingIndex;
+
+            //
+            // Generate starting guides 
+            //
+            inst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.BottomLeft;
+            for (int i = 1; i < level - 1; i++)
+                inst.GuideBlocks[nestingIndex + i] = ConsoleBorderStyle.TopBottom;
+
+            inst.GuideBlocks[nestingIndex + level - 1] = ConsoleBorderStyle.Bullet;
+
+
+            for (int i = 1; i < inst.JumpSize; i++)
+            {
+                var nestedInst = method.Instructions[inst.OrdinalIndex - i];
+
+                //
+                // Check prev guide and if the guide is TopBotom char then 
+                // we change our guide to a plus.
+                //
+                if (nestingIndex > 0 && nestedInst.GuideBlocks[nestingIndex - 1] == ConsoleBorderStyle.TopBottom)
+                    nestedInst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.SeparatorBoth;
+                else
+                    nestedInst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.Left;
+
+                //
+                // Populate everything down with whitespace.
+                //
+                for (int l = 1; l < level; l++)
+                {
+                    if (nestedInst.GuideBlocks[nestingIndex + l] == '\0')
+                        nestedInst.GuideBlocks[nestingIndex + l] = ' ';
+                }
+            }
+
+            //
+            // Generate ending guides 
+            //
+            var lastInst = method.Instructions[inst.OrdinalIndex - inst.JumpSize];
+            lastInst.GuideBlocks[nestingIndex] = ConsoleBorderStyle.TopLeft;
+            for (int i = 1; i < level - 1; i++)
+                lastInst.GuideBlocks[nestingIndex + i] = ConsoleBorderStyle.TopBottom;
+
+            lastInst.GuideBlocks[nestingIndex + level - 1] = '>';
+        }
+
         public string ToAsm(DecompilationUnit unit)
         {
             StringBuilder builder = new StringBuilder();
@@ -267,6 +496,19 @@ namespace PowerUp.Watcher
             {
                 if (method == null) continue;
 
+                var sizeAndNesting = PopulateGuides(method);
+
+                //
+                // Print messages.
+                //
+                if (method.Messages != null && method.Messages.Length > 0)
+                {
+                    builder.AppendLine(
+                        Environment.NewLine +
+                        string.Join(Environment.NewLine, method.Messages));
+                }
+
+                builder.AppendLine($"# Instruction Count: {method.Instructions.Count}; Code Size: {method.CodeSize}");
                 builder.Append($"{method.Return} {method.Name}(");
 
                 for (int i = 0; i < method.Arguments.Length; i++)
@@ -287,7 +529,11 @@ namespace PowerUp.Watcher
                     var offset = pad - inst.Instruction.Length;
                     if (offset < 0) offset = 0;
 
-                    builder.Append($"  {inst.Address.ToString("X")}: ");
+                    builder.Append("  ");
+
+                    AppendGuides(builder, inst, sizeAndNesting);
+                   
+                    builder.Append($"{inst.Address.ToString("X")}: ");
                     builder.Append($"{inst.Instruction} " + new string(' ', offset));
 
                     int idx = 0;
@@ -305,11 +551,38 @@ namespace PowerUp.Watcher
             return builder.ToString();
         }
 
+        private void AppendGuides(StringBuilder builder, AssemblyInstruction inst, (int jumpSize, int nestingLevel) sizeAndNesting)
+        {
+            int wsCount = 0;
+            bool usedGuides = false;
+            for (int i = 0; i <= sizeAndNesting.nestingLevel; i++)
+            {
+                var block = inst.GuideBlocks[i];
+
+                //
+                // Guide not found, append whitespace.
+                // @TODO: Most of this stuff is done when we're populating guides
+                // This loop should be as simple as possible.
+                //
+                if (block == '\0') wsCount++;
+                else
+                {
+                    if (wsCount > 0) builder.Append(new String(' ', wsCount));
+                    wsCount = 0;
+                    builder.Append((char)block);
+                    usedGuides = true;
+                }
+            }
+
+            if (sizeAndNesting.nestingLevel > 0 && usedGuides == false)
+                builder.Append(' ', sizeAndNesting.nestingLevel);
+        }
+
         private string CreateArgument(ulong methodAddress, ulong codeSize, AssemblyInstruction instruction, InstructionArg arg, bool isLast)
         {
             StringBuilder builder = new StringBuilder();
 
-            if (arg.HasReferenceAddress && instruction.RefAddress > 0)
+            if (instruction.jumpDirection != JumpDirection.None)
             {
                 var addressInArg = arg.Value.LastIndexOf(' ');
                 var value = arg.Value;
@@ -318,21 +591,15 @@ namespace PowerUp.Watcher
                     value = arg.Value.Substring(0, addressInArg);
                 }
 
-                var arrow = "↷";
-                if (instruction.RefAddress >= methodAddress && instruction.RefAddress <= methodAddress + codeSize)
-                {
-                    arrow = "⇡";
-                    if (instruction.Address < instruction.RefAddress)
-                        arrow = "⇣";
-                }
-                else
-                {
-                    arrow = "↷";
-                }
-
                 builder.Append($"{value.Trim()}");
                 builder.Append($" {instruction.RefAddress.ToString("X")}");
-                builder.Append($" {arrow}");
+
+                if (instruction.jumpDirection == JumpDirection.Out)
+                    builder.Append($" ↷");
+                else if (instruction.jumpDirection == JumpDirection.Up)
+                    builder.Append($" ⇡");
+                else if (instruction.jumpDirection == JumpDirection.Down)
+                    builder.Append($" ⇣");
             }
             else
             {
@@ -404,7 +671,7 @@ namespace PowerUp.Watcher
             var assemblyStream = compilation.AssemblyStream;
             var pdbStream = compilation.PDBStream;
 
-            XConsole.WriteLine(compilation.LanguageVersion);
+            XConsole.WriteLine($"Language Version: `{compilation.LanguageVersion}`");
 
             using (var ctx = new CustomAssemblyLoadContext())
             {
@@ -426,7 +693,7 @@ namespace PowerUp.Watcher
                     var loaded = ctx.LoadFromStream(assemblyStream);
                     var compiledType = loaded.GetType("CompilerGen");
                     var decompiledMethods = compiledType.ToAsm(@private: true);
-                    var messages = RunPostCompilationOperations(loaded, compiledType);
+                    RunPostCompilationOperations(loaded, compiledType, decompiledMethods);
                     HideDecompiledMethods(decompiledMethods);
 
                     assemblyStream.Position = 0;
@@ -435,7 +702,6 @@ namespace PowerUp.Watcher
                     ILDecompiler iLDecompiler = new ILDecompiler();
                     unit.ILCode = iLDecompiler.ToIL(assemblyStream, pdbStream);
                     unit.DecompiledMethods = decompiledMethods;
-                    unit.Messages = messages.ToArray();
                 }
 
                 return unit;
@@ -454,7 +720,7 @@ namespace PowerUp.Watcher
             }
         }
 
-        private List<string> RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType)
+        private void RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType, DecompiledMethod[] decompiledMethods)
         {
             List<string> messages = new List<string>();
 
@@ -474,6 +740,14 @@ namespace PowerUp.Watcher
                     messages.Add("# Warm-up Count: 1000 calls");
                     messages.Add($"# Took {summary} ms / 1000 calls");
                     messages.Add("# ");
+
+                    //
+                    // @TODO Refactor to something faster.
+                    //
+                    var found = decompiledMethods.FirstOrDefault(x => x.Name == methodUnderBenchmarkName);
+                    if (found != null) found.Messages = messages.ToArray();
+
+                    messages.Clear();
                 }
                 else
                 {
@@ -483,12 +757,23 @@ namespace PowerUp.Watcher
                     {
                         method.Invoke(instance, null);
                         var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
+
                         messages.AddRange(log);
+
+                        //
+                        // @TODO Refactor to something faster.
+                        //
+                        var found = decompiledMethods.FirstOrDefault(x => x.Name == method.Name);
+
+                        if (found != null) found.Messages = messages.ToArray();
+
+                        messages.Clear();
+
                     }
                 }
-            }
 
-            return messages;
+
+            }
         }
     }
 }

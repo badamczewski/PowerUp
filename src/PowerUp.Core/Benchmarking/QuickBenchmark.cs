@@ -136,11 +136,11 @@ namespace PowerUp.Core
                 {
                     refId = 0;
 
-                    for (refId = 0; refId < assemblyCode.RefIds.Length; refId++)
+                    for (refId = 0; refId < assemblyCode.GuideBlocks.Length; refId++)
                     {
-                        if(assemblyCode.RefIds[refId] <= 0)
+                        if(assemblyCode.GuideBlocks[refId] <= 0)
                         {
-                            assemblyCode.RefIds[refId] = idx;
+                            assemblyCode.GuideBlocks[refId] = idx;
                             break;
                         }
                     }
@@ -161,7 +161,7 @@ namespace PowerUp.Core
 
                             for (int i = start; i <= end; i++)
                             {
-                                root.Instructions[i].RefIds[refId] = idx;
+                                root.Instructions[i].GuideBlocks[refId] = idx;
                             }
 
                             break;
@@ -210,7 +210,7 @@ namespace PowerUp.Core
 
                 for (int r = refs - 1; r >= 0; r--)
                 {
-                    if (assemblyCode.RefIds[r] > 0)
+                    if (assemblyCode.GuideBlocks[r] > 0)
                     {
                         AssemblyInstruction nextInstruction = null;
 
@@ -229,7 +229,7 @@ namespace PowerUp.Core
                         // Prev instruction has different ref inentifier so it means we have to end
                         // our connection here.
                         //
-                        if (prevInstruction != null && prevInstruction.RefIds[r] != assemblyCode.RefIds[r])
+                        if (prevInstruction != null && prevInstruction.GuideBlocks[r] != assemblyCode.GuideBlocks[r])
                         {
                             prefix += XConsole.ConsoleBorderStyle.TopLeft.ToString();
                             prefix += XConsole.ConsoleBorderStyle.TopBottom.ToString();
@@ -239,7 +239,7 @@ namespace PowerUp.Core
                         //
                         // Next instruction has a different ID we have to break the connection here.
                         //
-                        else if (nextInstruction != null && nextInstruction.RefIds[r] != assemblyCode.RefIds[r])
+                        else if (nextInstruction != null && nextInstruction.GuideBlocks[r] != assemblyCode.GuideBlocks[r])
                         {
                             prefix += XConsole.ConsoleBorderStyle.BottomLeft.ToString();
                             prefix += XConsole.ConsoleBorderStyle.TopBottom.ToString();

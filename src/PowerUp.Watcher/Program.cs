@@ -11,18 +11,13 @@ namespace PowerUp.Watcher
 {
     class Program
     {
+        
+
         static void Main(string[] args)
         {
             XConsole.WriteLine("\r\n=== PowerUP Watcher. ===\r\n");
 
-            if (args.Length != 3)
-            {
-                XConsole.WriteLine("Missing Arguments:");
-                XConsole.WriteLine(" 'arg1' = Path to C#  file");
-                XConsole.WriteLine(" 'arg2' = Path to ASM file");
-                XConsole.WriteLine(" 'arg3' = Path to IL  file");
-                return;
-            }
+            if (ValidateArgs(args) == false) return;
 
             var configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
@@ -37,5 +32,30 @@ namespace PowerUp.Watcher
             t.Wait();
         }
 
+        static bool ValidateArgs(string[] args)
+        {
+            if (args.Length < 3)
+            {
+                //
+                // Figure out what's wrong.
+                //
+                XConsole.WriteLine("Missing Arguments:");
+
+                if (args.Length == 2)
+                    XConsole.WriteLine(" 'arg3' is missing");
+                else if (args.Length == 1)
+                    XConsole.WriteLine("'arg2' and 'arg3' are missing");
+                else if (args.Length == 0)
+                    XConsole.WriteLine("'arg1', 'arg2' and 'arg3' are missing");
+
+                XConsole.WriteLine("\r\nHelp:");
+                XConsole.WriteLine(" 'arg1' = Path to C#  file");
+                XConsole.WriteLine(" 'arg2' = Path to ASM file");
+                XConsole.WriteLine(" 'arg3' = Path to IL  file");
+                return false;
+            }
+
+            return true;
+        }
     }
 }

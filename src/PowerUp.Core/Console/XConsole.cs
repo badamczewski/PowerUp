@@ -196,6 +196,8 @@ namespace PowerUp.Core.Console
             public const char SeparatorTop = '┬';
             public const char SeparatorBottom = '┴';
             public const char SeparatorBoth = '┼';
+            public const char Bullet = '◦';
+            public const char Arrow = '➜';
         }
     }
 }

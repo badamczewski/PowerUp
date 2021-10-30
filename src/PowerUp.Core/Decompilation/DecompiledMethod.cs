@@ -52,6 +52,8 @@ namespace PowerUp.Core.Decompilation
 
         public uint CodeSize { get; set; }
         public ulong CodeAddress { get; set; }
+        public string[] Messages { get; set; } = Array.Empty<string>();
+
 
         public override string ToString()
         {
@@ -78,12 +80,26 @@ namespace PowerUp.Core.Decompilation
 
     public class AssemblyInstruction
     {
-        public int[] RefIds = new int[16];
+        public int OrdinalIndex { get; set; }
+
+        public int[] GuideBlocks = new int[64];
         public ulong RefAddress { get; set; }
         public ulong Address { get; set; }
         public string Instruction { get; set; }
         public string OpCode { get; set; }
         public InstructionArg[] Arguments { get; set; }
+        public JumpDirection jumpDirection { get; set; }
+        public int JumpSize { get; set; } = -1;
+        public int JumpIndex { get; set; } = -1;
+
+    }
+
+    public enum JumpDirection
+    {
+        None,
+        Up,
+        Down,
+        Out
     }
 
     public struct InstructionArg

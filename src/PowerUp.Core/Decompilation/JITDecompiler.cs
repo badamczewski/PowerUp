@@ -91,7 +91,8 @@ namespace PowerUp.Core.Decompilation
             var reader = new ByteArrayCodeReader(codeBuffer.ToArray());
             var decoder = Iced.Intel.Decoder.Create(64, reader);
             decoder.IP = codePtr;
-            
+            int instructionIndex = 0;
+
             while (reader.CanReadByte)
             {
                 decoder.Decode(out var instruction);
@@ -111,6 +112,7 @@ namespace PowerUp.Core.Decompilation
                 assemblyInstruction.Address = instruction.IP;
                 assemblyInstruction.RefAddress = instruction.MemoryAddress64;
                 assemblyInstruction.OpCode = instruction.OpCode.ToString();
+                assemblyInstruction.OrdinalIndex = instructionIndex++;
 
                 if (instNameIndex > 0)
                 {

@@ -75,8 +75,11 @@ namespace PowerUp.Core.Compilation
         private string RewriteCode(string code)
         {
             var benchCode = "";
+            //
+            // @TODO make this a single pass.
+            // 
             code = code.Replace("[NoInline]", "[MethodImpl(MethodImplOptions.NoInlining)]");
-            code = code.Replace("[Inline]",   "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+            code = code.Replace("[Inline]"  , "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
 
             var ast = CSharpSyntaxTree.ParseText(code);
             var root = ast.GetRoot();
