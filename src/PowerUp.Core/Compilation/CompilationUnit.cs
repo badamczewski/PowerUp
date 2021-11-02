@@ -16,5 +16,16 @@ namespace PowerUp.Core.Compilation
         public MemoryStream PDBStream { get; set; }
         public EmitResult CompilationResult { get; set; }
         public string LanguageVersion { get; set; }
+        public CompilationOptions CompilationOptions { get; set; } = new CompilationOptions();    
+    }
+
+    public class CompilationOptions
+    {
+        public bool ShowGuides { get; set; }
+        public bool ShortAddresses { get; set; }
+        public int AddressesCutByLength { get; set; } = 4;
+        public bool ShowASMDocumentation { get; set; }
+        public int ASMDocumentationOffset { get; set; } = 45;
+        public CompilationOptions() { }
     }
 }

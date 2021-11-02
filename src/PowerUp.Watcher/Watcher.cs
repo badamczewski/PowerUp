@@ -46,6 +46,7 @@ namespace PowerUp.Watcher
                 #endif
             }
         }
+
         public Watcher(IConfigurationRoot configuration)
         {
             _configuration = configuration;
@@ -82,7 +83,6 @@ namespace PowerUp.Watcher
             }
         }
 
-
         public Task WatchFile(string csharpFile, string outAsmFile, string outILFile)
         {
             Initialize(csharpFile, outAsmFile, outILFile);
@@ -114,6 +114,8 @@ namespace PowerUp.Watcher
                                 {
                                     unit = Decompile(code);
                                 }
+
+                                unit.Options = compilation.CompilationOptions;
 
                                 lastWrite = fileInfo.LastWriteTime;
                                 lastCode = code;
@@ -490,13 +492,19 @@ namespace PowerUp.Watcher
         public string ToAsm(DecompilationUnit unit)
         {
             StringBuilder builder = new StringBuilder();
+            StringBuilder lineBuilder = new StringBuilder();
             builder.AppendLine();
 
             foreach(var method in unit.DecompiledMethods)
             {
                 if (method == null) continue;
 
-                var sizeAndNesting = PopulateGuides(method);
+                (int jumpSize, int nestingLevel) sizeAndNesting = (-1,-1);
+
+                if (unit.Options.ShowGuides)
+                {
+                    sizeAndNesting = PopulateGuides(method);
+                }
 
                 //
                 // Print messages.
@@ -524,31 +532,127 @@ namespace PowerUp.Watcher
                 builder.AppendLine("):");
 
                 int pad = 6;
-                foreach(var inst in method.Instructions)
+
+                foreach (var inst in method.Instructions)
                 {
+                    lineBuilder.Clear();
+
                     var offset = pad - inst.Instruction.Length;
                     if (offset < 0) offset = 0;
 
-                    builder.Append("  ");
+                    lineBuilder.Append("  ");
 
-                    AppendGuides(builder, inst, sizeAndNesting);
-                   
-                    builder.Append($"{inst.Address.ToString("X")}: ");
-                    builder.Append($"{inst.Instruction} " + new string(' ', offset));
+                    AppendGuides(lineBuilder, inst, sizeAndNesting);
+
+                    if (unit.Options.ShortAddresses)
+                    {
+                        lineBuilder.Append($"{inst.Address.ToString("X").Substring(unit.Options.AddressesCutByLength)}: ");
+                    }
+                    else
+                    {
+                        lineBuilder.Append($"{inst.Address.ToString("X")}: ");
+                    }
+
+                    lineBuilder.Append($"{inst.Instruction} " + new string(' ', offset));
 
                     int idx = 0;
                     foreach (var arg in inst.Arguments)
                     {
-                        var argumentValue = CreateArgument(method.CodeAddress, method.CodeSize, inst, arg, idx == inst.Arguments.Length - 1);
-                        builder.Append(argumentValue);
+                        var argumentValue = CreateArgument(method.CodeAddress, method.CodeSize, inst, arg, idx == inst.Arguments.Length - 1, unit.Options);
+                        lineBuilder.Append(argumentValue);
 
                         idx++;
                     }
+
+                    if (unit.Options.ShowASMDocumentation)
+                    {
+                        AppendDocumentation(lineBuilder, method, inst, unit.Options);
+                    }
+
+                    builder.Append(lineBuilder.ToString());
                     builder.AppendLine();
                 }
             }
 
             return builder.ToString();
+        }
+
+        private void AppendDocumentation(StringBuilder lineBuilder, DecompiledMethod method, AssemblyInstruction instruction, Core.Compilation.CompilationOptions options)
+        {
+            int lineOffset = options.ASMDocumentationOffset;
+            if (lineBuilder.Length < lineOffset)
+            {
+                lineBuilder.Append(' ', lineOffset - lineBuilder.Length);
+            }
+            if (instruction.Instruction == "mov")
+            {
+                var lhs = instruction.Arguments[0].Value.Trim();
+                var rhs = instruction.Arguments[1].Value.Trim();
+
+                if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+                lineBuilder.Append($" # {lhs} = {rhs}");
+            }
+            else if(instruction.Instruction == "lea")
+            {
+                var lhs = instruction.Arguments[0].Value.Trim();
+                var rhs = instruction.Arguments[1].Value.Trim();
+
+                if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                if (rhs.StartsWith("[")) { rhs = rhs.Replace("[", "").Replace("]", ""); }
+                lineBuilder.Append($" # {lhs} = {rhs}");
+            }
+            else if (instruction.Instruction == "cmp")
+            {
+                if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
+                {
+                    string @operator = "NA";
+                    var inst = instruction;
+                    var next = method.Instructions[instruction.OrdinalIndex + 1];
+
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                    @operator = SetOperatorForASMDocs(next);
+                    lineBuilder.Append($" # if({lhs} {@operator} {rhs})");
+                }
+            }
+            else if (instruction.Instruction == "test")
+            {
+                if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
+                {
+                    string @operator = "NA";
+                    var inst = instruction;
+                    var next = method.Instructions[instruction.OrdinalIndex + 1];
+                    @operator = SetOperatorForASMDocs(next);
+                    lineBuilder.Append($" # if({inst.Arguments[0].Value.Trim()} & {inst.Arguments[1].Value} {@operator} 0)");
+                }
+            }
+        }
+
+        private string SetOperatorForASMDocs(AssemblyInstruction instruction)
+        {
+            return instruction.Instruction switch
+            {
+                "je" => "==",
+                "jne" => "!=",
+                "jl" => "<",
+                "jg" => ">",
+                "jle" => "<=",
+                "jge" => ">=",
+                //
+                // Unsigned
+                //
+                "jae" => ">=",
+                "jbe" => "<=",
+                "ja" => ">",
+                "jb" => "<",
+
+                _ => "NA"
+            };
         }
 
         private void AppendGuides(StringBuilder builder, AssemblyInstruction inst, (int jumpSize, int nestingLevel) sizeAndNesting)
@@ -578,7 +682,7 @@ namespace PowerUp.Watcher
                 builder.Append(' ', sizeAndNesting.nestingLevel);
         }
 
-        private string CreateArgument(ulong methodAddress, ulong codeSize, AssemblyInstruction instruction, InstructionArg arg, bool isLast)
+        private string CreateArgument(ulong methodAddress, ulong codeSize, AssemblyInstruction instruction, InstructionArg arg, bool isLast, Core.Compilation.CompilationOptions options)
         {
             StringBuilder builder = new StringBuilder();
 
@@ -592,7 +696,10 @@ namespace PowerUp.Watcher
                 }
 
                 builder.Append($"{value.Trim()}");
-                builder.Append($" {instruction.RefAddress.ToString("X")}");
+                if(options.ShortAddresses)
+                    builder.Append($" {instruction.RefAddress.ToString("X").Substring(options.AddressesCutByLength)}");
+                else
+                    builder.Append($" {instruction.RefAddress.ToString("X")}");
 
                 if (instruction.jumpDirection == JumpDirection.Out)
                     builder.Append($" ↷");

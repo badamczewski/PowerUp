@@ -29,8 +29,9 @@ namespace PowerUp.Core.Compilation
 
         public CompilationUnit Compile(string code)
         {
-            var sourceCode = RewriteCode(code);
-
+            CompilationOptions options = new CompilationOptions();
+            var sourceCode = RewriteCode(code, options);
+            
             var compilation = CSharpCompilation.Create("assembly")
             .WithOptions(
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
@@ -53,7 +54,7 @@ namespace PowerUp.Core.Compilation
 
             EmitOptions emitOptions = new EmitOptions(debugInformationFormat: DebugInformationFormat.PortablePdb);
             DecompilationUnit unit = new DecompilationUnit();
-
+            
             var assemblyStream = new MemoryStream();
             var pdbStream = new MemoryStream();
             var compilationResult = compilation.Emit(assemblyStream, pdbStream: pdbStream, options: emitOptions);
@@ -64,7 +65,8 @@ namespace PowerUp.Core.Compilation
                 AssemblyStream = assemblyStream,
                 PDBStream = pdbStream,
                 CompilationResult = compilationResult,
-                LanguageVersion = compilation.LanguageVersion.ToDisplayString()
+                LanguageVersion = compilation.LanguageVersion.ToDisplayString(),
+                CompilationOptions = options
             };
         }
 
@@ -72,68 +74,15 @@ namespace PowerUp.Core.Compilation
         // Parse and rewrite code to provide some extra utility when like
         // Running / Benchmark and Aliases on C# Methods and Classes.
         //
-        private string RewriteCode(string code)
+        private string RewriteCode(string code, CompilationOptions options)
         {
-            var benchCode = "";
-            //
-            // @TODO make this a single pass.
-            // 
-            code = code.Replace("[NoInline]", "[MethodImpl(MethodImplOptions.NoInlining)]");
-            code = code.Replace("[Inline]"  , "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-
             var ast = CSharpSyntaxTree.ParseText(code);
             var root = ast.GetRoot();
 
-            foreach (var node in root.DescendantNodes())
-            {
-                if (node.IsKind(SyntaxKind.InvocationExpression))
-                {
-                    var invocation = (InvocationExpressionSyntax)node;
-                    if (invocation?.Expression?.ToString() == "Print")
-                    {
-                        var printCall = invocation.Expression.ToString();
-                        var arg = invocation.ArgumentList.Arguments[0].ToString();
-                        if (invocation.ArgumentList.Arguments[0].Expression.Kind() == SyntaxKind.IdentifierName)
-                        {
-                            var newPrintCall = $"{printCall}({arg},nameof({arg}));";
-                            var oldPrintCall = $"{printCall}({arg});";
-                            code = code.Replace(oldPrintCall, newPrintCall);
-                        }
-                    }
-                }
-                else if (node.IsKind(SyntaxKind.LocalFunctionStatement))
-                {
-                    var func = (LocalFunctionStatementSyntax)node;
-                    if (func.AttributeLists.Count > 0)
-                    {
-                        foreach (var list in func.AttributeLists)
-                        {
-                            if (list.Attributes.FirstOrDefault(x => x.Name.ToString() == "Bench") != null)
-                            {
-                                //
-                                // Generate benchmark function
-                                //
-                                var functionName = func.Identifier.ValueText;
-                                //
-                                // Add Bench Code
-                                //
-                                benchCode += $@"
-                                    public long Bench_{functionName}() 
-                                    {{ 
-                                        Stopwatch w = new Stopwatch();
-                                        for(int i = 0; i < 1000; i++) {functionName}();
-                                        w.Start();
-                                        for(int i = 0; i < 1000; i++) {functionName}();
-                                        w.Stop();
-                                        return w.ElapsedMilliseconds;
-                                    }}
-
-                                    ";
-                            }
-                        }
-                    }
-                }
-            }
+            CodeRewriter rewriter = new CodeRewriter(options);
+            root          = rewriter.Visit(root);
+            code          = root.ToFullString();
+            var benchCode = rewriter.GetBenchCodeOrEmpty();
 
             var sourceCode = $@"
                     using System.Linq;
