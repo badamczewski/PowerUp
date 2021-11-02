@@ -55,8 +55,6 @@ namespace PowerUp.Core.Decompilation
         public uint CodeSize { get; set; }
         public ulong CodeAddress { get; set; }
         public string[] Messages { get; set; } = Array.Empty<string>();
-
-
         public override string ToString()
         {
             StringBuilder builder = new StringBuilder();

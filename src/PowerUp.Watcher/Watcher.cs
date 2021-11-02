@@ -131,6 +131,9 @@ namespace PowerUp.Watcher
                                         errorBuilder.AppendLine($"{error.Message} {error.Trace} {error.Position}");
                                         errorBuilder.AppendLine($"{Environment.NewLine}-----------------------------");
                                     }
+
+                                    XConsole.WriteLine($"Writing Errors to: {outAsmFile}, {outILFile}");
+
                                     var errors = errorBuilder.ToString();
                                     File.WriteAllText(outAsmFile, errors);
                                     File.WriteAllText(outILFile, errors);
@@ -156,6 +159,9 @@ namespace PowerUp.Watcher
                                             string.Join(Environment.NewLine, unit.Messages);
                                     }
 
+
+                                    XConsole.WriteLine($"Writing Results to: {outAsmFile}, {outILFile}");
+
                                     File.WriteAllText(outAsmFile, asmCode);
                                     File.WriteAllText(outILFile, ilCode);
                                 }
@@ -165,6 +171,7 @@ namespace PowerUp.Watcher
                     }
                     catch (Exception ex)
                     {
+                        XConsole.WriteLine($"Writing Errors to: {outAsmFile}, {outILFile}");
                         //
                         // Report this back to the out files.
                         //
@@ -303,7 +310,7 @@ namespace PowerUp.Watcher
         // 
         private (int jumpSize, int nestingLevel) PopulateGuides(DecompiledMethod method)
         {
-            if (method == null) return (0, 0);
+            if (method == null || method.Instructions.Any() == false) return (0, 0);
 
             var methodAddress = method.CodeAddress;
             var codeSize = method.CodeSize;
@@ -560,7 +567,6 @@ namespace PowerUp.Watcher
                     {
                         var argumentValue = CreateArgument(method.CodeAddress, method.CodeSize, inst, arg, idx == inst.Arguments.Length - 1, unit.Options);
                         lineBuilder.Append(argumentValue);
-
                         idx++;
                     }
 
@@ -593,7 +599,20 @@ namespace PowerUp.Watcher
                 if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
                 lineBuilder.Append($" # {lhs} = {rhs}");
             }
-            else if(instruction.Instruction == "lea")
+            else if (instruction.Instruction == "movsxd")
+            {
+                var lhs = instruction.Arguments[0].Value.Trim();
+                var rhs = instruction.Arguments[1].Value.Trim();
+
+                if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
+                if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
+
+                lineBuilder.Append($" # {lhs} = {rhs}");
+            }
+            else if (instruction.Instruction == "lea")
             {
                 var lhs = instruction.Arguments[0].Value.Trim();
                 var rhs = instruction.Arguments[1].Value.Trim();
@@ -601,6 +620,77 @@ namespace PowerUp.Watcher
                 if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
                 if (rhs.StartsWith("[")) { rhs = rhs.Replace("[", "").Replace("]", ""); }
                 lineBuilder.Append($" # {lhs} = {rhs}");
+            }
+            else if (instruction.Instruction == "inc")
+            {
+                var lhs = instruction.Arguments[0].Value.Trim();
+
+                if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                lineBuilder.Append($" # {lhs}++");
+            }
+            else if (instruction.Instruction == "call")
+            {
+                var lhs = instruction.Arguments[0].Value.Trim();
+
+                if (lhs.StartsWith("CORINFO") && lhs.EndsWith("FAIL"))
+                {
+                    lineBuilder.Append($" # throw");
+                }
+            }
+            else if (instruction.Instruction == "add")
+            {
+                string stackInfo = "";
+                var lhs = instruction.Arguments[0].Value.Trim();
+                var rhs = instruction.Arguments[1].Value.Trim();
+
+                if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                if (IsHex(rhs))
+                    rhs = HexToDecimal(rhs);
+
+                if (lhs == "rsp")
+                    stackInfo = $"stack.pop({rhs})";
+
+                lineBuilder.Append($" # {lhs} += {rhs} {stackInfo}");
+            }
+            else if (instruction.Instruction == "sub")
+            {
+                string stackInfo = "";
+                var lhs = instruction.Arguments[0].Value.Trim();
+                var rhs = instruction.Arguments[1].Value.Trim();
+
+                if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                if (IsHex(rhs))
+                    rhs = HexToDecimal(rhs);
+
+                if (lhs == "rsp")
+                    stackInfo = $"stack.push({rhs})";
+
+                lineBuilder.Append($" # {lhs} -= {rhs} {stackInfo}");
+            }
+            else if (instruction.Instruction == "xor")
+            {
+                var lhs = instruction.Arguments[0].Value.Trim();
+                var rhs = instruction.Arguments[1].Value.Trim();
+
+
+                if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                if (IsHex(rhs))
+                    rhs = HexToDecimal(rhs);
+
+                if (lhs == rhs)
+                    lineBuilder.Append($" # {lhs} = 0");
+                else
+                    lineBuilder.Append($" # {lhs} ^= {rhs}");
+            }
+            else if (instruction.Instruction == "ret")
+            {
+                lineBuilder.Append($" # return;");
             }
             else if (instruction.Instruction == "cmp")
             {
@@ -615,6 +705,9 @@ namespace PowerUp.Watcher
 
                     if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
                     if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                    if (IsHex(rhs))
+                        rhs = HexToDecimal(rhs);
 
                     @operator = SetOperatorForASMDocs(next);
                     lineBuilder.Append($" # if({lhs} {@operator} {rhs})");
@@ -631,6 +724,22 @@ namespace PowerUp.Watcher
                     lineBuilder.Append($" # if({inst.Arguments[0].Value.Trim()} & {inst.Arguments[1].Value} {@operator} 0)");
                 }
             }
+        }
+
+        private bool IsHex(string value)
+        { 
+            if(value != null)
+            {
+                return char.IsDigit(value[0]) && value[value.Length - 1] == 'h';
+            }
+            return false;
+        }
+
+        private string HexToDecimal(string value)
+        {
+            var hexEssence = value.Substring(0, value.Length - 1);
+            int decValue = Convert.ToInt32(hexEssence, 16);
+            return decValue.ToString();
         }
 
         private string SetOperatorForASMDocs(AssemblyInstruction instruction)
@@ -710,6 +819,8 @@ namespace PowerUp.Watcher
             }
             else
             {
+
+                
                 //Parse Value
                 var value = arg.Value.Trim();
                 var code = string.Empty;
@@ -859,24 +970,39 @@ namespace PowerUp.Watcher
                 else
                 {
                     var attributes = method.GetCustomAttributes();
-
-                    if (attributes.FirstOrDefault(x => x.GetType().Name == "RunAttribute") != null)
+                    foreach(var attribute in attributes)
                     {
-                        method.Invoke(instance, null);
-                        var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
+                        var name = attribute.GetType().Name;
 
-                        messages.AddRange(log);
+                        if (name == "RunAttribute")
+                        {
+                            method.Invoke(instance, null);
+                            var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
 
-                        //
-                        // @TODO Refactor to something faster.
-                        //
-                        var found = decompiledMethods.FirstOrDefault(x => x.Name == method.Name);
+                            messages.AddRange(log);
 
-                        if (found != null) found.Messages = messages.ToArray();
+                            //
+                            // @TODO Refactor to something faster.
+                            //
+                            var found = decompiledMethods.FirstOrDefault(x => x.Name == method.Name);
 
-                        messages.Clear();
+                            if (found != null) found.Messages = messages.ToArray();
 
+                            messages.Clear();
+                        }
+                        else if(name == "HideAttribute")
+                        {
+                            for (int i = 0; i < decompiledMethods.Length; i++)
+                            {
+                                if (decompiledMethods[i].Name == method.Name)
+                                {
+                                    decompiledMethods[i].Instructions.Clear();
+                                    break;
+                                }
+                            }
+                        }
                     }
+
                 }
 
 

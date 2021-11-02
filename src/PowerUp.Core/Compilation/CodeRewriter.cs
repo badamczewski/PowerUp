@@ -111,7 +111,6 @@ namespace PowerUp.Core.Compilation
                         _options.ShortAddresses = true;
                         remove = true;
                         _options.AddressesCutByLength = TryExtractValueFromAttribute<int>(attr, "by");
-
                         break;
                     case "Inline":
                         return CreateAttribute("MethodImpl", "MethodImplOptions", "AggressiveInlining");
@@ -152,10 +151,10 @@ namespace PowerUp.Core.Compilation
         {
             AttributeArgumentListSyntax attributeArgumentListSyntax = null;
 
-            if (property == null || value == null)
+            if (property != null && value != null)
             {
-                var memberName = SyntaxFactory.IdentifierName("MethodImplOptions");
-                var simpleName = (SimpleNameSyntax)SyntaxFactory.IdentifierName("AggressiveInlining");
+                var memberName = SyntaxFactory.IdentifierName(property);
+                var simpleName = (SimpleNameSyntax)SyntaxFactory.IdentifierName(value);
                 var memberAccess = SyntaxFactory.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, memberName, simpleName);
 
                 var expandedAttrArgs = SyntaxFactory.SeparatedList<AttributeArgumentSyntax>();

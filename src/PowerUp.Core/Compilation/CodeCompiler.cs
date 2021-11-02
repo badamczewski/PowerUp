@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
+
 namespace PowerUp.Core.Compilation
 {
     public class CodeCompiler
@@ -37,7 +38,6 @@ namespace PowerUp.Core.Compilation
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                     .WithOptimizationLevel(OptimizationLevel.Release)
                     .WithAllowUnsafe(true)
-                   
             )
             .AddReferences(
                 MetadataReference.CreateFromFile(typeof(object).GetTypeInfo().Assembly.Location),
@@ -86,7 +86,6 @@ namespace PowerUp.Core.Compilation
 
             var sourceCode = $@"
                     using System.Linq;
-                    using System.Runtime.CompilerServices;
                     using System.Diagnostics;
                     using System;
                     using System.Runtime.CompilerServices;
@@ -94,6 +93,7 @@ namespace PowerUp.Core.Compilation
                     using System.Collections;
                     using System.Linq.Expressions;
                     using System.Runtime.InteropServices;
+                    using System.Threading.Tasks;
 
 
                     [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
@@ -112,6 +112,13 @@ namespace PowerUp.Core.Compilation
                         }}
                     }}
 
+                    [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                    sealed class HideAttribute : Attribute
+                    {{
+                        public HideAttribute()
+                        {{
+                        }}
+                    }}
 
                     public class _Log 
                     {{
