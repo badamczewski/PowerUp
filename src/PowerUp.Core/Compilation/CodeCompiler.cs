@@ -33,11 +33,12 @@ namespace PowerUp.Core.Compilation
             CompilationOptions options = new CompilationOptions();
             var sourceCode = RewriteCode(code, options);
             
-            var compilation = CSharpCompilation.Create("assembly")
+            var compilation = CSharpCompilation.Create("assembly_" + DateTime.Now.Ticks.ToString())
             .WithOptions(
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                     .WithOptimizationLevel(OptimizationLevel.Release)
                     .WithAllowUnsafe(true)
+                    
             )
             .AddReferences(
                 MetadataReference.CreateFromFile(typeof(object).GetTypeInfo().Assembly.Location),
@@ -76,13 +77,14 @@ namespace PowerUp.Core.Compilation
         //
         private string RewriteCode(string code, CompilationOptions options)
         {
-            var ast = CSharpSyntaxTree.ParseText(code);
+            var ast  = CSharpSyntaxTree.ParseText(code);
             var root = ast.GetRoot();
 
             CodeRewriter rewriter = new CodeRewriter(options);
             root          = rewriter.Visit(root);
             code          = root.ToFullString();
             var benchCode = rewriter.GetBenchCodeOrEmpty();
+            var usingCode = rewriter.GetUsingsOrEmpty();
 
             var sourceCode = $@"
                     using System.Linq;
@@ -95,6 +97,23 @@ namespace PowerUp.Core.Compilation
                     using System.Runtime.InteropServices;
                     using System.Threading.Tasks;
 
+                    {usingCode}
+
+                    [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                    sealed class JITAttribute : Attribute
+                    {{
+                        private Type[] _types;
+
+                        public JITAttribute(params Type[] types)
+                        {{
+                            _types = types;
+                        }}
+
+                        public Type[] Types
+                        {{
+                            get {{ return _types; }}
+                        }}
+                    }}
 
                     [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                     sealed class BenchAttribute : Attribute
@@ -102,6 +121,10 @@ namespace PowerUp.Core.Compilation
                         public BenchAttribute()
                         {{
                         }}
+
+                        public int WarmUpCount {{ get; set; }} = 1000;
+                        public int RunCount {{ get; set; }} = 1000;
+
                     }}
 
                     [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]

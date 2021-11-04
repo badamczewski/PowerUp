@@ -52,11 +52,46 @@ namespace PowerUp.Core.Decompilation
 
         public unsafe (ulong codePointer, uint codeSize) GetMethodAddress(ClrRuntime runtime, MethodInfo method)
         {
-            var clrmdMethodHandle = runtime.GetMethodByHandle((ulong)method.MethodHandle.Value.ToInt64());
-            if (clrmdMethodHandle.NativeCode == 0) throw new InvalidOperationException($"Unable to disassemble method `{method}`");
+            var handleValue = (ulong)method.MethodHandle.Value.ToInt64();
+            ulong codePtr = 0;
+            uint  codeSize = 0;
+            //
+            // For generic methods we need a different way of finding out the generic type implementation
+            // that JIT has created.
+            //
+            // @NOTE: I don't know how to do it any other way than using SOS lib and getting
+            // the data out this way. We should not rely on SOS long term since it is worth while
+            // to learn how the data is laid out in the VM.
+            //
+            if (method.IsGenericMethod)
+            {
+                //
+                // Get the SOS interface and try to extract all of the needed information by using 
+                // Method Desc (MD) and extracting the Method Table (MT), this will allow us the extract
+                // the code data header.
+                //
+                // @TODO / @NOTE: In theory this could be better since now we have access to tireded 
+                // metadata, which should be somewhere in the code header (JITType field)
+                //
+                var sos = runtime.DacLibrary.SOSDacInterface;
+                if (sos.GetMethodDescData(handleValue, 0, out var data))
+                {
+                    var slot = sos.GetMethodTableSlot(data.MethodTable, data.SlotNumber);
+                    if(sos.GetCodeHeaderData(data.NativeCodeAddr, out var code))
+                    {
+                        codePtr  = code.MethodStart;
+                        codeSize = code.HotRegionSize;     
+                    }
+                }
+            }
+            else
+            {
+                var clrmdMethodHandle = runtime.GetMethodByHandle(handleValue);
+                if (clrmdMethodHandle.NativeCode == 0) throw new InvalidOperationException($"Unable to disassemble method `{method}`");
 
-            var codePtr  = clrmdMethodHandle.HotColdInfo.HotStart;
-            var codeSize = clrmdMethodHandle.HotColdInfo.HotSize;
+                codePtr  = clrmdMethodHandle.HotColdInfo.HotStart;
+                codeSize = clrmdMethodHandle.HotColdInfo.HotSize;
+            }
 
             return (codePtr, codeSize);
         }

@@ -48,7 +48,6 @@ namespace PowerUp.Core.Decompilation
         public string Name { get; set; }
         public string Return { get; set; }
         public string[] Arguments { get; set; }
-
         public List<AssemblyInstruction> Instructions { get; set; }
             = new List<AssemblyInstruction>();
 

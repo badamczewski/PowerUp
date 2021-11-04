@@ -9,10 +9,9 @@ using System.Threading.Tasks;
 
 namespace PowerUp.Watcher
 {
+
     class Program
     {
-        
-
         static void Main(string[] args)
         {
             XConsole.WriteLine("\r\n=== PowerUP Watcher. ===\r\n");
@@ -24,7 +23,7 @@ namespace PowerUp.Watcher
             .AddJsonFile("appsettings.json", false)
             .Build();
 
-            Watcher w = new Watcher(configuration);
+            Watcher w = new Watcher(configuration, false);
             var t = w.WatchFile(
                 args[0],
                 args[1],

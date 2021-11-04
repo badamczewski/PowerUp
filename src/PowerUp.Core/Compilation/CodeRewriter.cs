@@ -13,7 +13,7 @@ namespace PowerUp.Core.Compilation
     {
         private readonly CompilationOptions _options;
         private readonly StringBuilder _benchCodeBuilder = new();
-
+        private readonly StringBuilder _usingBuilder     = new();  
         public CodeRewriter(CompilationOptions options)
         {
             _options = options;
@@ -24,30 +24,61 @@ namespace PowerUp.Core.Compilation
             return _benchCodeBuilder.ToString();
         }
 
+        public string GetUsingsOrEmpty()
+        {
+            return _usingBuilder.ToString();
+        }
+
+        public override SyntaxNode VisitUsingDirective(UsingDirectiveSyntax node)
+        {
+            //
+            // This using directive is in the wrong place, and we need to move it to usings.
+            // The reason for this is the design of the compiler file.
+            // We want to have a minimal expierence where you can just type in the file
+            // without ever providing any usings, namespaces, classes or anything else,
+            // it has to just work.
+            //
+            // That's why we generate code arround what you type to make the compiler happy.
+            // But that also means that if you need something added we have to take it and put it,
+            // in the correct place.
+            //
+            _usingBuilder.AppendLine(node.ToFullString());
+
+            return null;
+        }
+
         public override SyntaxNode VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
         {
             if (node.AttributeLists.Count > 0)
             {
                 foreach (var list in node.AttributeLists)
                 {
-                    if (list.Attributes.FirstOrDefault(x => x.Name.ToString() == "Bench") != null)
+                    var found = list.Attributes.FirstOrDefault(x => x.Name.ToString() == "Bench");
+                    if (found != null)
                     {
                         //
                         // Generate benchmark function
                         //
                         var functionName = node.Identifier.ValueText;
+
+                        var warmUpCount = TryExtractValueFromAttribute<int>(found, "WarmUpCount");
+                        var runCount    = TryExtractValueFromAttribute<int>(found, "RunCount");
+
+                        if (warmUpCount == 0) warmUpCount = 1000;
+                        if (runCount == 0)    runCount = 1000;
+
                         //
                         // Add Bench Code
                         //
                         _benchCodeBuilder.Append($@"
-                                    public long Bench_{functionName}() 
+                                    public (long,int,int) Bench_{functionName}() 
                                     {{ 
                                         Stopwatch w = new Stopwatch();
-                                        for(int i = 0; i < 1000; i++) {functionName}();
+                                        for(int i = 0; i < {warmUpCount}; i++) {functionName}();
                                         w.Start();
-                                        for(int i = 0; i < 1000; i++) {functionName}();
+                                        for(int i = 0; i < {runCount}; i++) {functionName}();
                                         w.Stop();
-                                        return w.ElapsedMilliseconds;
+                                        return (w.ElapsedMilliseconds, {warmUpCount}, {runCount});
                                     }}
 
                                     ");

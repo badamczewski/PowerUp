@@ -4,6 +4,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using PowerUp.Core.Console;
+using System.Linq;
+using PowerUp.Core.Decompilation.Attributes;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -47,9 +49,43 @@ namespace PowerUp.Core.Decompilation
         /// <returns></returns>
         public static DecompiledMethod ToAsm(this MethodInfo methodInfo)
         {
-            RuntimeHelpers.PrepareMethod(methodInfo.MethodHandle);
+            var info = methodInfo;
+            if (info.IsGenericMethod)
+            {
+                //
+                // There's a reason why we are not using a type class called JITAttribute
+                // (which we have in our lib), if we load the exact same code in two different
+                // application domains the runtime will refuse to cast them and raise
+                // InvalidCastException
+                // 
+                // We have to use reflection to be safe.
+                //
+                var attributes = info.GetCustomAttributes();
+                foreach(var attribute in attributes)
+                {
+                    var type = attribute.GetType();
+                    //
+                    // If we find the correct attribute, then there's no turning back
+                    // Use relection and should you fail, then fail fast.
+                    //
+                    // We need to make a generic method for each provided JIT attribute 
+                    // So if we provide JIT[typeof(int)] JIT[typeof(string)] we are compiling not one,
+                    // but two methods. 
+                    //
+                    // @TODO Multiple JIT attribute handling is not yet done.
+                    //
+                    if(type.Name == "JITAttribute")
+                    {
+                        var props = type.GetProperties();
+                        var types = props.First(x => x.Name == "Types");
+                        var value = (Type[])types.GetValue(attribute);
+                        info = info.MakeGenericMethod(value);
+                    }
+                }               
+            }
+            RuntimeHelpers.PrepareMethod(info.MethodHandle);
             var decompiler = new JitCodeDecompiler();
-            var decompiled = decompiler.DecompileMethod(methodInfo);
+            var decompiled = decompiler.DecompileMethod(info);
 
             return decompiled;
         }
