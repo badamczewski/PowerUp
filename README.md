@@ -1,5 +1,7 @@
 # PowerUp
 
+![powerUp2](https://user-images.githubusercontent.com/752380/140500855-988c87c9-b15b-438b-a44e-61f71c2a90a3.png)
+
 The purpose of this library is to provide productivity utilities and tools such as:
 
 * Live IDE Watcher.
