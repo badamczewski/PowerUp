@@ -92,10 +92,10 @@ namespace PowerUp.Core.Decompilation
                                 {
                                     fieldLayouts.Add(new FieldLayout()
                                     {
-                                        Name = @"BYTE_PADDING ]",
+                                        Name = null,
                                         Offset = fieldEndOffset,
-                                        Type = "[",
-                                        Size = next.Offset
+                                        Type = @"BYTE_PADDING",
+                                        Size = next.Offset - fieldEndOffset
                                     });
                                 }
                             }
