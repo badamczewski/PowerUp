@@ -25,6 +25,7 @@ using Microsoft.Extensions.Configuration;
 using PowerUp.Core.Console;
 using static PowerUp.Core.Console.XConsole;
 using System.Diagnostics;
+using TypeLayout = PowerUp.Core.Decompilation.TypeLayout;
 
 namespace PowerUp.Watcher
 {
@@ -505,13 +506,46 @@ namespace PowerUp.Watcher
             lastInst.GuideBlocks[nestingIndex + level - 1] = '>';
         }
 
+        private string ToLayout(TypeLayout[] typeLayouts)
+        {
+            int pad = 8;
+            
+            StringBuilder layoutBuilder = new StringBuilder();
+            foreach (var typeLayout in typeLayouts)
+            {
+                layoutBuilder.AppendLine($"# {typeLayout.Name} Memory Layout. {(typeLayout.IsBoxed ? "\r\n# (struct sizes might be wrong since they are boxed to extract layouts)" : "")} ");
+                layoutBuilder.AppendLine($"{(typeLayout.IsBoxed ? "struct" : "class")} {typeLayout.Name}");
+                layoutBuilder.AppendLine("{");
+                foreach (var fieldLayout in typeLayout.Fields)
+                {
+                    var offsetString = $"[{fieldLayout.Offset}-{fieldLayout.Offset + fieldLayout.Size}]";
+                    var padBy = pad - offsetString.Length;
+
+                    layoutBuilder.AppendLine($"    {offsetString} {new string(' ', padBy)} {fieldLayout.Type} {fieldLayout.Name}");
+                }
+                layoutBuilder.AppendLine($"    Size: {typeLayout.Size} {(typeLayout.IsBoxed ? "# Estimated" : "")}");
+
+                layoutBuilder.AppendLine("}");
+                layoutBuilder.AppendLine();
+            }
+
+            return layoutBuilder.ToString();
+        }
+
         public string ToAsm(DecompilationUnit unit)
         {
             StringBuilder builder = new StringBuilder();
             StringBuilder lineBuilder = new StringBuilder();
+
             builder.AppendLine();
 
-            foreach(var method in unit.DecompiledMethods)
+            if (unit.TypeLayouts != null && unit.TypeLayouts.Any())
+            {
+                builder.AppendLine(ToLayout(unit.TypeLayouts));
+                builder.AppendLine();
+            }
+
+            foreach (var method in unit.DecompiledMethods)
             {
                 if (method == null) continue;
 
@@ -933,7 +967,8 @@ namespace PowerUp.Watcher
                     var loaded = ctx.LoadFromStream(assemblyStream);
 
                     var compiledType = loaded.GetType("CompilerGen");
-                    var decompiledMethods = compiledType.ToAsm(@private: true);
+                    var decompiledMethods  = compiledType.ToAsm(@private: true);
+                    var typesMemoryLayouts = compiledType.ToLayout(@private: true);
 
                     RunPostCompilationOperations(loaded, compiledType, decompiledMethods);
                     HideDecompiledMethods(decompiledMethods);
@@ -944,6 +979,7 @@ namespace PowerUp.Watcher
                     ILDecompiler iLDecompiler = new ILDecompiler();
                     unit.ILCode = iLDecompiler.ToIL(assemblyStream, pdbStream);
                     unit.DecompiledMethods = decompiledMethods;
+                    unit.TypeLayouts = typesMemoryLayouts;
                 }
 
                 return unit;

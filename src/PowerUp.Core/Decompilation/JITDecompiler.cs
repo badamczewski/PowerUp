@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Linq;
 using Iced.Intel;
 using Microsoft.Diagnostics.Runtime;
+using System.Threading;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -14,6 +15,115 @@ namespace PowerUp.Core.Decompilation
     /// </summary>
     public class JitCodeDecompiler
     {
+        public TypeLayout GetTypeLayout(Type type)
+        {
+            using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id,
+                UInt32.MaxValue,
+                AttachFlag.Passive))
+            {
+                var clrVersion = dataTarget.ClrVersions.First();
+                var runtime = clrVersion.CreateRuntime();
+
+                //
+                // Attempt to make ClrMd aware of recent jitting:
+                //
+                // @NOTE: Not sure if this is needed any longer but it doesn't matter for us here.
+                // Link: https://github.com/microsoft/clrmd/issues/303
+                //
+                dataTarget.DataReader.Flush();
+                //
+                // @SIZE_OF_STRUCTS:
+                //
+                // We need some trickery here:
+                // In order to be able to extract struct layout in a simple way; the struct needs to be promoted to the heap.
+                // There are a couple of reasons for this like Enregistering Structs by the compiler.
+                // This means that many structs are never allocated on the stack nor the heap but only live in CPU regs.
+                //
+                // To be consistent it's easier to promote the struct to the heap (boxing) but this will mess with
+                // struct sizes, so in order to figure it out let's stick to a couple of established rules.
+                //
+                // Empty Struct has a size of 1 - The compiler will actually report that.
+                // Empty Struct on the heap has 0 size + the metadata header size.
+                //
+                // So here's how we're going to estimate the size correctly:
+                // 1. If the struct is empty report 1.
+                // 2. If the struct is non-empty then we should get the correct report
+                // by computing the offset + size of the fields, since the structs will follow
+                // a packing scheme and they should be sorted from smallest + PAD to the biggest
+                // fields.
+                //
+                // We could run into problems when the last field has a pad ... but I did some tests
+                // and it never happened not even with Pack = 1
+                //
+                TypeLayout decompiledType = null;
+                List<FieldLayout> fieldLayouts = new List<FieldLayout>(8);
+                foreach (ClrObject obj in runtime.Heap.EnumerateObjects())
+                {
+                    if (obj.Type != null && obj.Type.Name == type.FullName)
+                    {
+                        fieldLayouts.Clear();
+
+                        decompiledType = new TypeLayout();
+                        decompiledType.Name = obj.Type.Name;
+                        decompiledType.Fields = new FieldLayout[obj.Type.Fields.Count];
+                        decompiledType.IsBoxed = obj.IsBoxed;
+                        decompiledType.Size = obj.Size;
+
+                        int fieldIndex = 0;
+                        foreach (var field in obj.Type.Fields)
+                        {
+                            fieldLayouts.Add(new FieldLayout()
+                            {
+                                Name = field.Name,
+                                Offset = field.Offset,
+                                Type = field.Type.Name,
+                                Size = field.Size
+                            });
+
+                            if (fieldIndex + 1 < obj.Type.Fields.Count)
+                            {
+                                var next = obj.Type.Fields[fieldIndex + 1];
+                                //
+                                // We have found a gap.
+                                // Create a new field that will represent the gap.
+                                //
+                                var fieldEndOffset = field.Offset + field.Size;
+                                if (field.Offset + field.Size != next.Offset)
+                                {
+                                    fieldLayouts.Add(new FieldLayout()
+                                    {
+                                        Name = @"BYTE_PADDING ]",
+                                        Offset = fieldEndOffset,
+                                        Type = "[",
+                                        Size = next.Offset
+                                    });
+                                }
+                            }
+
+                            fieldIndex++;
+                        }
+
+                        decompiledType.Fields = fieldLayouts.ToArray();
+                        //
+                        // @SIZE_OF_STRUCTS:
+                        //
+                        if (type.IsValueType && obj.IsBoxed)
+                        {
+                            if (obj.Type.Fields.Any() == false)
+                                decompiledType.Size = 1;
+                            else
+                            {
+                                var last = decompiledType.Fields.Last();
+                                decompiledType.Size = (ulong)(last.Offset + last.Size);
+                            }
+                        }
+                    }
+                }
+
+                return decompiledType;
+            }
+        }
+
         public DecompiledMethod DecompileMethod(MethodInfo method, string functionCallName = null)
         {
             using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id,
@@ -74,6 +184,7 @@ namespace PowerUp.Core.Decompilation
                 // metadata, which should be somewhere in the code header (JITType field)
                 //
                 var sos = runtime.DacLibrary.SOSDacInterface;
+
                 if (sos.GetMethodDescData(handleValue, 0, out var data))
                 {
                     var slot = sos.GetMethodTableSlot(data.MethodTable, data.SlotNumber);

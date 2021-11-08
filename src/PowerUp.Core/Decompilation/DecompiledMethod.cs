@@ -7,11 +7,11 @@ using System.Text;
 
 namespace PowerUp.Core.Decompilation
 {
-
     public class DecompilationUnit
     {
         public Error[] Errors { get; set; }  = Array.Empty<Error>();
         public DecompiledMethod[] DecompiledMethods { get; set; }
+        public TypeLayout[] TypeLayouts { get; set; }
         public ILToken[] ILCode { get; set; }
         public string[] Messages { get; set; } = Array.Empty<string>();
         public CompilationOptions Options { get; set; }

@@ -11,6 +11,34 @@ namespace PowerUp.Core.Decompilation
 {
     public static class JitExtensions
     {
+        public static TypeLayout[] ToLayout(this Type typeInfo, bool @private = false)
+        {
+            List<TypeLayout> types = new List<TypeLayout>();
+            var decompiler = new JitCodeDecompiler();
+
+            var flags = BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance;
+            if (@private)
+            {
+                flags |= BindingFlags.NonPublic;
+            }
+
+            foreach(var type in typeInfo.GetNestedTypes(flags))
+            {
+                //
+                // Create the type instance to be able to see it's layout.
+                //
+                var _ = type.Assembly.CreateInstance(type.FullName);
+                //
+                // Now Get the layout.
+                //
+                var typeMemLayout = decompiler.GetTypeLayout(type);
+                if (typeMemLayout != null)
+                    types.Add(typeMemLayout);
+            }
+
+            return types.ToArray(); 
+        }
+
         public static DecompiledMethod[] ToAsm(this Type typeInfo, bool @private = false)
         {
             List<DecompiledMethod> methods = new List<DecompiledMethod>();
