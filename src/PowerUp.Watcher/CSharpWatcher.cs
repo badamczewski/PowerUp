@@ -29,7 +29,7 @@ using TypeLayout = PowerUp.Core.Decompilation.TypeLayout;
 
 namespace PowerUp.Watcher
 {
-    public class Watcher
+    public class CSharpWatcher
     {
         private IConfigurationRoot _configuration;
 
@@ -51,7 +51,7 @@ namespace PowerUp.Watcher
             }
         }
 
-        public Watcher(IConfigurationRoot configuration, bool unsafeUseTieredCompilation = false)
+        public CSharpWatcher(IConfigurationRoot configuration, bool unsafeUseTieredCompilation = false)
         {
             _configuration = configuration;
             _unsafeUseTieredCompilation = unsafeUseTieredCompilation;
@@ -59,6 +59,8 @@ namespace PowerUp.Watcher
 
         private void Initialize(string csharpFile, string outAsmFile, string outILFile)
         {
+            XConsole.WriteLine("CSharp Watcher Initialize:");
+
             InitializeCsharpCompiler();
 
             XConsole.WriteLine($"`Input File`: {csharpFile}");
@@ -518,7 +520,7 @@ namespace PowerUp.Watcher
                 layoutBuilder.AppendLine("{");
                 foreach (var fieldLayout in typeLayout.Fields)
                 {
-                    var offsetString = $"[{fieldLayout.Offset}-{fieldLayout.Offset + fieldLayout.Size}]";
+                    var offsetString = $"[{fieldLayout.Offset}-{fieldLayout.Offset + fieldLayout.Size})";
                     var padBy = pad - offsetString.Length;
 
                     layoutBuilder.AppendLine($"    {offsetString} {new string(' ', padBy)} {fieldLayout.Type} {fieldLayout.Name}");
