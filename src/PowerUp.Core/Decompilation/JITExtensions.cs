@@ -25,13 +25,10 @@ namespace PowerUp.Core.Decompilation
             foreach(var type in typeInfo.GetNestedTypes(flags))
             {
                 //
-                // Create the type instance to be able to see it's layout.
-                //
-                var _ = type.Assembly.CreateInstance(type.FullName);
-                //
                 // Now Get the layout.
                 //
-                var typeMemLayout = decompiler.GetTypeLayout(type);
+                var obj = type.Assembly.CreateInstance(type.FullName);
+                var typeMemLayout = decompiler.GetTypeLayoutFromHeap(type, obj);
                 if (typeMemLayout != null)
                     types.Add(typeMemLayout);
             }

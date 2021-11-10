@@ -6,6 +6,8 @@ using System.Linq;
 using Iced.Intel;
 using Microsoft.Diagnostics.Runtime;
 using System.Threading;
+using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -15,7 +17,21 @@ namespace PowerUp.Core.Decompilation
     /// </summary>
     public class JitCodeDecompiler
     {
-        public TypeLayout GetTypeLayout(Type type)
+        [StructLayout(LayoutKind.Sequential)]
+        internal sealed class Pinnable
+        {
+            public ulong Pin;
+        }
+
+        //
+        // This method gets the layout out of the heap memory,
+        // the reason why this name is so specific is the fact that you can get
+        // it also by enumerating type information on the heap:
+        //     runtime.Heap.EnumerateTypes()
+        // Both versions seem to work well for estimating sizes and fields,
+        // but I'm not sure if getting it straight from the heap mem isn't better.
+        //
+        public unsafe TypeLayout GetTypeLayoutFromHeap(Type type, object instance)
         {
             using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id,
                 UInt32.MaxValue,
@@ -57,70 +73,90 @@ namespace PowerUp.Core.Decompilation
                 //
                 TypeLayout decompiledType = null;
                 List<FieldLayout> fieldLayouts = new List<FieldLayout>(8);
-                foreach (ClrObject obj in runtime.Heap.EnumerateObjects())
+                //
+                // Use the pinnable object pattern to create an immovable pointer to the object.
+                // This uses a neat trick which reinterprets the object as something else and exposes
+                // it's pointer that we can fix.
+                //
+                fixed (ulong* p = &Unsafe.As<Pinnable>(instance).Pin)
                 {
-                    if (obj.Type != null && obj.Type.Name == type.FullName)
+                    //
+                    // @NOTE: This will work only on x64, not sure if we should care about
+                    // 32bit enviroments but if this becomes a problem then we have many options
+                    // to fix this.
+                    //
+                    // Get Object Metadata from the heap using its address:
+                    // Any time you get a pointer to the object it will always point on the first
+                    // field, which is not what we want here since we want to point at the Method Table
+                    // [SyncBlkIndex ... Other][MT][FieldA][FieldB]
+                    //
+                    var obj = runtime.Heap.GetObject((ulong)(p - 1));
+                    if(obj.Type != null)
                     {
-                        fieldLayouts.Clear();
-
-                        decompiledType = new TypeLayout();
-                        decompiledType.Name = obj.Type.Name;
-                        decompiledType.Fields = new FieldLayout[obj.Type.Fields.Count];
-                        decompiledType.IsBoxed = obj.IsBoxed;
-                        decompiledType.Size = obj.Size;
-
-                        int fieldIndex = 0;
-                        foreach (var field in obj.Type.Fields)
+                        if (obj.Type != null && obj.Type.Name == type.FullName)
                         {
-                            fieldLayouts.Add(new FieldLayout()
-                            {
-                                Name = field.Name,
-                                Offset = field.Offset,
-                                Type = field.Type.Name,
-                                Size = field.Size
-                            });
+                            fieldLayouts.Clear();
 
-                            if (fieldIndex + 1 < obj.Type.Fields.Count)
+                            decompiledType = new TypeLayout();
+                            decompiledType.Name = obj.Type.Name;
+                            decompiledType.Fields = new FieldLayout[obj.Type.Fields.Count];
+                            decompiledType.IsBoxed = obj.IsBoxed;
+                            decompiledType.Size = obj.Size;
+
+                            int fieldIndex = 0;
+                            foreach (var field in obj.Type.Fields)
                             {
-                                var next = obj.Type.Fields[fieldIndex + 1];
-                                //
-                                // We have found a gap.
-                                // Create a new field that will represent the gap.
-                                //
-                                var fieldEndOffset = field.Offset + field.Size;
-                                if (field.Offset + field.Size != next.Offset)
+                                fieldLayouts.Add(new FieldLayout()
                                 {
-                                    fieldLayouts.Add(new FieldLayout()
+                                    Name = field.Name,
+                                    Offset = field.Offset,
+                                    Type = field.Type.Name,
+                                    Size = field.Size
+                                });
+
+                                if (fieldIndex + 1 < obj.Type.Fields.Count)
+                                {
+                                    var next = obj.Type.Fields[fieldIndex + 1];
+                                    //
+                                    // We have found a gap.
+                                    // Create a new field that will represent the gap.
+                                    //
+                                    var fieldEndOffset = field.Offset + field.Size;
+                                    if (field.Offset + field.Size != next.Offset)
                                     {
-                                        Name = null,
-                                        Offset = fieldEndOffset,
-                                        Type = @"BYTE_PADDING",
-                                        Size = next.Offset - fieldEndOffset
-                                    });
+                                        fieldLayouts.Add(new FieldLayout()
+                                        {
+                                            Name = null,
+                                            Offset = fieldEndOffset,
+                                            Type = @"BYTE_PADDING",
+                                            Size = next.Offset - fieldEndOffset
+                                        });
+                                    }
+                                }
+
+                                fieldIndex++;
+                            }
+
+                            decompiledType.Fields = fieldLayouts.ToArray();
+                            //
+                            // @SIZE_OF_STRUCTS:
+                            //
+                            if (type.IsValueType && obj.IsBoxed)
+                            {
+                                if (obj.Type.Fields.Any() == false)
+                                    decompiledType.Size = 1;
+                                else
+                                {
+                                    var last = decompiledType.Fields.Last();
+                                    decompiledType.Size = (ulong)(last.Offset + last.Size);
                                 }
                             }
-
-                            fieldIndex++;
                         }
 
-                        decompiledType.Fields = fieldLayouts.ToArray();
-                        //
-                        // @SIZE_OF_STRUCTS:
-                        //
-                        if (type.IsValueType && obj.IsBoxed)
-                        {
-                            if (obj.Type.Fields.Any() == false)
-                                decompiledType.Size = 1;
-                            else
-                            {
-                                var last = decompiledType.Fields.Last();
-                                decompiledType.Size = (ulong)(last.Offset + last.Size);
-                            }
-                        }
                     }
-                }
 
-                return decompiledType;
+                    return decompiledType;
+                }
             }
         }
 
