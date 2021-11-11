@@ -3,7 +3,7 @@
   <PropertyGroup>
 	<TargetFrameworks>net5.0;net6.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
-    <TieredCompilation>false</TieredCompilation>
+    <TieredCompilation>true</TieredCompilation>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 

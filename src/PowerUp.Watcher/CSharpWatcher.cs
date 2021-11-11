@@ -558,12 +558,8 @@ namespace PowerUp.Watcher
                 if (method == null) continue;
 
                 (int jumpSize, int nestingLevel) sizeAndNesting = (-1,-1);
-
-                if (unit.Options.ShowGuides)
-                {
-                    sizeAndNesting = PopulateGuides(method);
-                }
-
+                sizeAndNesting = PopulateGuides(method);
+                
                 //
                 // Print messages.
                 //
@@ -600,7 +596,10 @@ namespace PowerUp.Watcher
 
                     lineBuilder.Append("  ");
 
-                    AppendGuides(lineBuilder, inst, sizeAndNesting);
+                    if (unit.Options.ShowGuides)
+                    {
+                        AppendGuides(lineBuilder, inst, sizeAndNesting);
+                    }
 
                     if (unit.Options.ShortAddresses)
                     {
@@ -728,7 +727,6 @@ namespace PowerUp.Watcher
                 {
                     var lhs = instruction.Arguments[0].Value.Trim();
                     var rhs = instruction.Arguments[1].Value.Trim();
-
 
                     if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
                     if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
@@ -1074,8 +1072,6 @@ namespace PowerUp.Watcher
                     }
 
                 }
-
-
             }
         }
     }
