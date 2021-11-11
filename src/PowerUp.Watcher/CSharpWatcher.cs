@@ -77,6 +77,12 @@ namespace PowerUp.Watcher
                 XConsole.WriteLine("'[WARNING]': IL File doesn't exist");
 
             XConsole.WriteLine($"`Libs  Path`: {_compiler.DotNetCoreDirPath}");
+
+            if(Directory.Exists(_compiler.DotNetCoreDirPath) == false)
+            {
+                XConsole.WriteLine($"'Cannot find the libs under Path: {_compiler.DotNetCoreDirPath}");
+            } 
+
             XConsole.WriteLine($"`Language  Version`: {_compiler.LanguageVersion.ToDisplayString()}");
             XConsole.WriteLine($"`.NET Version`: {Environment.Version.ToString()}");
             XConsole.WriteLine(IsDebug ? "'[DEBUG]'" : "`[RELEASE]`");
