@@ -59,8 +59,8 @@ namespace PowerUp.Watcher
                 _pathToGOCompiler += Path.DirectorySeparatorChar;
             }
 
-            if(File.Exists(_pathToGOCompiler) == false)
-                XConsole.WriteLine("'[WARNING]': Compiler Not Found");
+            if(Directory.Exists(_pathToGOCompiler) == false)
+                XConsole.WriteLine("'[WARNING]': Compiler Directory Not Found");
 
 
             XConsole.WriteLine($"`Compiler  Path`: {_pathToGOCompiler}");

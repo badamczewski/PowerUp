@@ -516,22 +516,102 @@ namespace PowerUp.Watcher
 
         private string ToLayout(TypeLayout[] typeLayouts)
         {
-            int pad = 8;
-            
+            int offsetPad = 8;
+            int sizePad   = 30;
+            int tableSize = 42;
+            var headerTopBottom = new string(ConsoleBorderStyle.TopBottom, tableSize);
+            var displayPadding = new string(' ', 4);
+
             StringBuilder layoutBuilder = new StringBuilder();
             foreach (var typeLayout in typeLayouts)
             {
+                displayPadding = new string(' ', 4);
+
                 layoutBuilder.AppendLine($"# {typeLayout.Name} Memory Layout. {(typeLayout.IsBoxed ? "\r\n# (struct sizes might be wrong since they are boxed to extract layouts)" : "")} ");
                 layoutBuilder.AppendLine($"{(typeLayout.IsBoxed ? "struct" : "class")} {typeLayout.Name}");
                 layoutBuilder.AppendLine("{");
+
+                bool isHeaderEnd = false;
+                int index = 0;
                 foreach (var fieldLayout in typeLayout.Fields)
                 {
-                    var offsetString = $"[{fieldLayout.Offset}-{fieldLayout.Offset + fieldLayout.Size})";
-                    var padBy = pad - offsetString.Length;
+                    layoutBuilder.Append(displayPadding);
+                    //
+                    // For reference types we need to include the Metadata
+                    // which means that we will check if a collection of fields
+                    // has a header flag set:
+                    // 
+                    // [0] - IsHeader = true  -> Render 'Metadata' string and top guides and the field  
+                    // [1] - IsHeader = true  -> Render left and right guids and the field
+                    // [2] - IsHeader = true  -> Render left and right guids and the field
+                    // [3] - IsHeader = false -> Render 'Fields' string and bottom guides and then the field
+                    // (Which will not be a part of the header table)
+                    //
+                    if (typeLayout.IsBoxed == false)
+                    {
+                        if (index == 0 && fieldLayout.IsHeader == true)
+                        {
+                            layoutBuilder.AppendLine(@"Metadata:");
+                            layoutBuilder.Append(displayPadding);
+                            layoutBuilder.AppendLine(ConsoleBorderStyle.TopLeft + headerTopBottom + ConsoleBorderStyle.TopRight);
+                            layoutBuilder.Append(displayPadding);
+                            layoutBuilder.Append(ConsoleBorderStyle.Left + " ");
+                        }
+                        else if (index > 0 && fieldLayout.IsHeader == true)
+                        {
+                            layoutBuilder.Append(ConsoleBorderStyle.Left + " ");
+                        }
+                        else if (isHeaderEnd == false)
+                        {
+                            isHeaderEnd = true;
+                            layoutBuilder.AppendLine(ConsoleBorderStyle.BottomLeft + headerTopBottom + ConsoleBorderStyle.BottomRight);
+                            layoutBuilder.Append(displayPadding);
+                            layoutBuilder.AppendLine(@"Fields:");
+                            displayPadding += "  ";
+                            layoutBuilder.Append(displayPadding);
+                        }
+                    }
+                    else
+                    {
+                        if (index == 0)
+                        {
+                            layoutBuilder.AppendLine(@"Fields:");
+                            displayPadding += "  ";
+                            layoutBuilder.Append(displayPadding);
+                        }
+                    }
 
-                    layoutBuilder.AppendLine($"    {offsetString} {new string(' ', padBy)} {fieldLayout.Type} {fieldLayout.Name}");
+                    var offsetString  = $"[{fieldLayout.Offset}-{fieldLayout.Offset + fieldLayout.Size - 1}]";
+                    var padBy         = offsetPad - offsetString.Length;
+                    var line          = $"{offsetString} {new string(' ', padBy)} {fieldLayout.Type} {fieldLayout.Name}";
+                    var sizeInBytesPad = "";
+
+                    //
+                    // Pad the (X bytes) string such that it's all nicley 
+                    // aligned when we render multiple lines on screen.
+                    //
+                    if (sizePad - line.Length > 0)
+                    {
+                        sizeInBytesPad = new string(' ', sizePad - line.Length);
+                    }
+                    var sizeInBytes  = $"{sizeInBytesPad}({fieldLayout.Size} bytes)";
+                    layoutBuilder.Append(line + sizeInBytes);
+
+                    //
+                    // Create the right hand size of the table ('|') with the correct pad and placement  
+                    //
+                    if (index >= 0 && fieldLayout.IsHeader == true)
+                    {
+                        var toPad = tableSize - (line.Length + sizeInBytes.Length) - 1;
+                        layoutBuilder.Append(new String(' ', toPad) + ConsoleBorderStyle.Left);
+                    }
+
+                    layoutBuilder.AppendLine();
+
+                    index++;
                 }
-                layoutBuilder.AppendLine($"    Size: {typeLayout.Size} {(typeLayout.IsBoxed ? "# Estimated" : "")}");
+                layoutBuilder.AppendLine($"    Size:    {typeLayout.Size} {(typeLayout.IsBoxed ? "# Estimated" : "")}");
+                layoutBuilder.AppendLine($"    Padding: {typeLayout.PaddingSize} {(typeLayout.IsBoxed ? "# Estimated" : "")}");
 
                 layoutBuilder.AppendLine("}");
                 layoutBuilder.AppendLine();

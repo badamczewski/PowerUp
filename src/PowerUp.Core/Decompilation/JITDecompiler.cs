@@ -103,15 +103,49 @@ namespace PowerUp.Core.Decompilation
                             decompiledType.IsBoxed = obj.IsBoxed;
                             decompiledType.Size = obj.Size;
 
-                            int fieldIndex = 0;
+                            var isClass = (type.IsValueType && obj.IsBoxed) == false;
+                            int fieldIndex  = 0;
+                            int baseOffset  = 0;
+                            //
+                            // Add Class Header Metadata
+                            //
+                            if (isClass)
+                            {
+                                var header = new FieldLayout()
+                                {
+                                    IsHeader = true,
+                                    Name = null,
+                                    Offset = 0,
+                                    Type = "Object Header",
+                                    Size = sizeof(IntPtr)
+                                };
+                                var mt = new FieldLayout()
+                                {
+                                    IsHeader = true,
+                                    Name = null,
+                                    Offset = header.Offset + header.Size,
+                                    Type = "Method Table Ptr",
+                                    Size = sizeof(IntPtr)
+                                };
+
+                                fieldLayouts.Add(header);
+                                fieldLayouts.Add(mt);
+
+                                baseOffset  += mt.Offset + mt.Size;
+                            }
+
                             foreach (var field in obj.Type.Fields)
                             {
+                                var size = field.Size;
+                                if(field.ElementType == ClrElementType.Struct)
+                                    size = sizeof(IntPtr);
+                                
                                 fieldLayouts.Add(new FieldLayout()
                                 {
                                     Name = field.Name,
-                                    Offset = field.Offset,
+                                    Offset = baseOffset + field.Offset,
                                     Type = field.Type.Name,
-                                    Size = field.Size
+                                    Size = size
                                 });
 
                                 if (fieldIndex + 1 < obj.Type.Fields.Count)
@@ -121,16 +155,19 @@ namespace PowerUp.Core.Decompilation
                                     // We have found a gap.
                                     // Create a new field that will represent the gap.
                                     //
-                                    var fieldEndOffset = field.Offset + field.Size;
-                                    if (field.Offset + field.Size != next.Offset)
+                                    var fieldEndOffset  = baseOffset + field.Offset + size;
+                                    if (fieldEndOffset != baseOffset + next.Offset)
                                     {
-                                        fieldLayouts.Add(new FieldLayout()
+                                        var padding = new FieldLayout()
                                         {
                                             Name = null,
                                             Offset = fieldEndOffset,
-                                            Type = @"BYTE_PADDING",
-                                            Size = next.Offset - fieldEndOffset
-                                        });
+                                            Type = $"Padding",
+                                            Size = next.Offset - (field.Offset + size)
+                                        };
+
+                                        fieldLayouts.Add(padding);
+                                        decompiledType.PaddingSize += (ulong)padding.Size;
                                     }
                                 }
 
@@ -148,7 +185,7 @@ namespace PowerUp.Core.Decompilation
                                 else
                                 {
                                     var last = decompiledType.Fields.Last();
-                                    decompiledType.Size = (ulong)(last.Offset + last.Size);
+                                    decompiledType.Size = (ulong)(baseOffset + last.Offset + last.Size);
                                 }
                             }
                         }
