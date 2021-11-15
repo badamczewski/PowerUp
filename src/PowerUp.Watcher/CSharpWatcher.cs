@@ -520,7 +520,7 @@ namespace PowerUp.Watcher
             int sizePad   = 30;
             int tableSize = 42;
             var headerTopBottom = new string(ConsoleBorderStyle.TopBottom, tableSize);
-            var displayPadding = new string(' ', 4);
+            var displayPadding  = new string(' ', 4);
 
             StringBuilder layoutBuilder = new StringBuilder();
             foreach (var typeLayout in typeLayouts)

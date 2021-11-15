@@ -15,10 +15,9 @@ namespace PowerUp.Watcher
     {
         static void Main(string[] args)
         {
-            var commands = ParseArguments(args);
-
             XConsole.WriteLine("\r\n=== `PowerUP Watcher` ===\r\n");
 
+            var commands = ParseArguments(args);
             if (ValidateCommands(commands) == false) return;
 
             var configuration = new ConfigurationBuilder()
@@ -35,6 +34,7 @@ namespace PowerUp.Watcher
                         command.Arguments[0],
                         command.Arguments[1],
                         command.Arguments[2]);
+
                 }
                 else if (command.Name == "go")
                 {
