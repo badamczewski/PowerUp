@@ -311,8 +311,12 @@ namespace PowerUp.Core.Console
             {
                 var c = input.Span[i];
 
-                if (IsQuote(c) == true || (char.IsLetter(c) == false &&
-                     char.IsDigit(c) == false &&
+                if (IsQuote(c) == true || 
+                    IsBracketClose(c)  ||
+                    IsBracketOpen(c)   ||
+                    IsSeparator(c)     ||
+                    (char.IsLetter(c) == false &&
+                     char.IsDigit(c) == false  &&
                      char.IsPunctuation(c) == false &&
                      char.IsSymbol(c) == false) && c != '_')
                 {
