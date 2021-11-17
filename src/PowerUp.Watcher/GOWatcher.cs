@@ -26,6 +26,7 @@ using PowerUp.Core.Console;
 using static PowerUp.Core.Console.XConsole;
 using System.Diagnostics;
 using TypeLayout = PowerUp.Core.Decompilation.TypeLayout;
+using CompilationOptions = PowerUp.Core.Compilation.CompilationOptions;
 
 namespace PowerUp.Watcher
 {
@@ -127,8 +128,16 @@ namespace PowerUp.Watcher
 
                                 lastCode = code;
 
+                                var options = ProcessCommandOptions(code);
                                 var methods = ParseASM(File.ReadAllText(tmpAsmFile));
-                                var asmCode = ToAsmString(new DecompilationUnit() { DecompiledMethods = methods });
+
+                                var unit = new DecompilationUnit() 
+                                { 
+                                    DecompiledMethods = methods, 
+                                    Options = options 
+                                };
+
+                                var asmCode = ToAsmString(unit);
 
                                 File.WriteAllText(outAsmFile, asmCode);
 
@@ -148,6 +157,22 @@ namespace PowerUp.Watcher
                 }
             });
             return iDontCareAboutThisTask;
+        }
+
+        private CompilationOptions ProcessCommandOptions(string asm)
+        {
+            CompilationOptions options = new CompilationOptions();
+            if(asm.IndexOf("//up:showGuides") != -1)
+            {
+                options.ShowGuides = true;
+            }
+
+            if(asm.IndexOf("//up:showASMDocs") != -1)
+            {
+                options.ShowASMDocumentation = true;
+            }
+
+            return options;
         }
 
         public string ToAsmString(DecompilationUnit unit)
@@ -207,7 +232,10 @@ namespace PowerUp.Watcher
 
                     lineBuilder.Append("  ");
 
-                    AppendGuides(lineBuilder, inst, sizeAndNesting);
+                    if (unit.Options.ShowGuides)
+                    {
+                        AppendGuides(lineBuilder, inst, sizeAndNesting);
+                    }
                     lineBuilder.Append($"{hexPad}{hexAddrSize}: ");
                     lineBuilder.Append($"{inst.Instruction} " + new string(' ', offset));
 
@@ -218,7 +246,11 @@ namespace PowerUp.Watcher
                         lineBuilder.Append(argumentValue);
                         idx++;
                     }
-
+                    if (unit.Options.ShowASMDocumentation)
+                    {
+                        unit.Options.ASMDocumentationOffset = 40;
+                        AppendDocumentation(lineBuilder, method, inst, unit.Options);
+                    }
                     builder.Append(lineBuilder.ToString());
                     builder.AppendLine();
                 }
@@ -228,6 +260,152 @@ namespace PowerUp.Watcher
             }
 
             return builder.ToString();
+        }
+
+        private void AppendDocumentation(StringBuilder lineBuilder, DecompiledMethod method, AssemblyInstruction instruction, Core.Compilation.CompilationOptions options)
+        {
+            try
+            {
+                int lineOffset = options.ASMDocumentationOffset;
+                if (lineBuilder.Length < lineOffset)
+                {
+                    lineBuilder.Append(' ', lineOffset - lineBuilder.Length);
+                }
+                if (instruction.Instruction == "MOVQ")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (lhs.StartsWith("(")) { lhs = "Memory" + lhs; }
+                    if (rhs.StartsWith("(")) { rhs = "Memory" + rhs; }
+                    lineBuilder.Append($" # {rhs} = {lhs}");
+                }
+                else if (instruction.Instruction == "LEAQ")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (rhs.StartsWith("(")) { rhs = "Memory" + rhs; }
+                    if (lhs.StartsWith("(")) { lhs = lhs.Replace("(", "").Replace(")", ""); }
+                    lineBuilder.Append($" # {rhs} = {lhs}");
+                }
+                else if (instruction.Instruction == "INCQ")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+
+                    if (lhs.StartsWith("(")) { lhs = "Memory" + lhs; }
+                    lineBuilder.Append($" # {lhs}++");
+                }
+                else if (instruction.Instruction == "ADDQ")
+                {
+                    string stackInfo = "";
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (lhs.StartsWith("(")) { lhs = "Memory" + lhs; }
+                    if (rhs.StartsWith("(")) { rhs = "Memory" + rhs; }
+
+                    if (rhs == "SP")
+                        stackInfo = $"stack.pop({lhs})";
+
+                    lineBuilder.Append($" # {rhs} += {lhs} {stackInfo}");
+                }
+                else if (instruction.Instruction == "SUBQ")
+                {
+                    string stackInfo = "";
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (lhs.StartsWith("(")) { lhs = "Memory" + lhs; }
+                    if (rhs.StartsWith("(")) { rhs = "Memory" + rhs; }
+
+                    if (rhs == "SP")
+                        stackInfo = $"stack.push({lhs})";
+
+                    lineBuilder.Append($" # {rhs} -= {lhs} {stackInfo}");
+                }
+                else if (instruction.Instruction == "XORL")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (lhs.StartsWith("(")) { lhs = "Memory" + lhs; }
+                    if (rhs.StartsWith("(")) { rhs = "Memory" + rhs; }
+
+                    if (lhs == rhs)
+                        lineBuilder.Append($" # {lhs} = 0");
+                    else
+                        lineBuilder.Append($" # {lhs} ^= {rhs}");
+                }
+                else if (instruction.Instruction == "RET")
+                {
+                    lineBuilder.Append($" # return");
+                }
+                else if (instruction.Instruction == "CMPQ")
+                {
+                    if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
+                    {
+                        string @operator = "NA";
+                        var inst = instruction;
+                        var next = method.Instructions[instruction.OrdinalIndex + 1];
+
+                        var lhs = instruction.Arguments[0].Value.Trim();
+                        var rhs = instruction.Arguments[1].Value.Trim();
+
+                        if (lhs.StartsWith("(")) { lhs = "Memory" + lhs; }
+                        if (rhs.StartsWith("(")) { rhs = "Memory" + rhs; }
+
+                        @operator = SetOperatorForASMDocs(next);
+                        lineBuilder.Append($" # if({rhs} {@operator} {lhs})");
+                    }
+                }
+                else if (jumpInstructions.Contains(instruction.Instruction))
+                {
+                    var prev = method.Instructions[instruction.OrdinalIndex - 1];
+                    var guide = prev.Instruction == "CMPQ" ? XConsole.ConsoleBorderStyle.BottomLeft.ToString() + "> " : "";
+                    var lhs = instruction.RefAddress.ToString("X");
+                    lineBuilder.Append($" # {guide}goto {lhs}");
+                }
+
+            }
+            catch (Exception ex)
+            {
+                //
+                // Ignore this error, we don't want to crash the output if documentaton
+                // blows up.
+                //
+                // Log it to the console and move on.
+                //
+                XConsole.WriteLine($"'Documentation Generation Failed with message: {ex.Message}'");
+            }
+        }
+
+        private string SetOperatorForASMDocs(AssemblyInstruction instruction)
+        {
+            return instruction.Instruction switch
+            {
+                "JEQ" => "==",
+                "JNE" => "!=",
+                "JLT" => "<",
+                "JGT" => ">",
+                "JLE" => "<=",
+                "JGE" => ">=",
+                //
+                // Unsigned
+                //
+                "JCC" => ">=",
+                "JLS" => "<=",
+                "JHI" => ">",
+                "JCS" => "<",
+
+                _ => "NA"
+            };
+        }
+
+        private string HexStrToDecimalStr(string value)
+        {
+            int decValue = Convert.ToInt32(value, 16);
+            return decValue.ToString();
         }
 
         private void AppendGuides(StringBuilder builder, AssemblyInstruction inst, (int jumpSize, int nestingLevel) sizeAndNesting)
@@ -336,6 +514,7 @@ namespace PowerUp.Watcher
             // 
             // Let's parse instruction lines for now (an instruction line will always contain an address)
             // since this should give us all of the information that we need.
+            //
             //
             var lines = asm
                 .Trim()
