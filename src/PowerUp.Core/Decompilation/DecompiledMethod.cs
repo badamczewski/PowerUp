@@ -98,7 +98,8 @@ namespace PowerUp.Core.Decompilation
         None,
         Up,
         Down,
-        Out
+        Out,
+        Label
     }
 
     public struct InstructionArg

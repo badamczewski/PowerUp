@@ -43,6 +43,13 @@ namespace PowerUp.Watcher
                         command.Arguments[0],
                         command.Arguments[1]);
                 }
+                else if(command.Name == "rs")
+                {
+                    RustWatcher goWatcher = new RustWatcher(configuration);
+                    _ = goWatcher.WatchFile(
+                        command.Arguments[0],
+                        command.Arguments[1]);
+                }
             }
 
             //
@@ -58,7 +65,7 @@ namespace PowerUp.Watcher
             if (commands.Count == 0)
             {
                 XConsole.WriteLine("'No Watcher Arguments provided.'");
-                XConsole.WriteLine("A valid argument has a command like: `-cs`, `-go`; followed by a list of arguments.\r\n");
+                XConsole.WriteLine("A valid argument has a command like: `-cs`, `-go`, `rs`; followed by a list of arguments.\r\n");
                 XConsole.WriteLine("Example:");
                 XConsole.WriteLine("`-cs` 'C:\\code.cs C:\\out.asm C:\\out.il' `-go` 'C:\\code.go C:\\out.asm'\r\n\r");
                 isOK = false;

@@ -60,7 +60,7 @@ namespace PowerUp.Watcher
             "JMP"
         };
     
-        private string _pathToGOCompiler;
+        private string _pathToCompiler;
         private IConfigurationRoot _configuration;
 
         public GOWatcher(IConfigurationRoot configuration)
@@ -81,18 +81,18 @@ namespace PowerUp.Watcher
             if (File.Exists(outAsmFile) == false)
                 XConsole.WriteLine("'[WARNING]': ASM File doesn't exist");
 
-            _pathToGOCompiler = _configuration["GOCompilerPath"]; 
+            _pathToCompiler = _configuration["GOCompilerPath"]; 
 
-            if (_pathToGOCompiler.EndsWith(Path.DirectorySeparatorChar) == false)
+            if (_pathToCompiler.EndsWith(Path.DirectorySeparatorChar) == false)
             {
-                _pathToGOCompiler += Path.DirectorySeparatorChar;
+                _pathToCompiler += Path.DirectorySeparatorChar;
             }
 
-            if(Directory.Exists(_pathToGOCompiler) == false)
+            if(Directory.Exists(_pathToCompiler) == false)
                 XConsole.WriteLine("'[WARNING]': Compiler Directory Not Found");
 
 
-            XConsole.WriteLine($"`Compiler  Path`: {_pathToGOCompiler}");
+            XConsole.WriteLine($"`Compiler  Path`: {_pathToCompiler}");
         }
 
         public Task WatchFile(string goFile, string outAsmFile)
@@ -100,7 +100,7 @@ namespace PowerUp.Watcher
             Initialize(goFile, outAsmFile);
 
             var tmpAsmFile = outAsmFile + "_tmp.asm";
-            var command = $"{_pathToGOCompiler}go.exe tool compile -S {goFile} > {tmpAsmFile}";
+            var command = $"{_pathToCompiler}go.exe tool compile -S {goFile} > {tmpAsmFile}";
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
             var iDontCareAboutThisTask = Task.Run(async () =>
@@ -177,8 +177,9 @@ namespace PowerUp.Watcher
 
         public string ToAsmString(DecompilationUnit unit)
         {
-            StringBuilder builder = new StringBuilder();
-            StringBuilder lineBuilder = new StringBuilder();
+            var builder     = new StringBuilder();
+            var lineBuilder = new StringBuilder();
+            var writer      = new AssemblyWriter();
 
             foreach (var method in unit.DecompiledMethods)
             {
@@ -189,55 +190,40 @@ namespace PowerUp.Watcher
                 //
                 // Print messages.
                 //
-                if (method.Messages != null && method.Messages.Length > 0)
-                {
-                    builder.AppendLine(
-                        Environment.NewLine +
-                        string.Join(Environment.NewLine, method.Messages));
-                }
+                writer.AppendMessages(builder, method);
+                //
+                // Write out method signature.
+                //
+                writer.AppendMethodSignature(builder, method);
 
-                builder.AppendLine($"# Instruction Count: {method.Instructions.Count}; Code Size: {method.CodeSize}");
-                builder.Append($"{method.Return} {method.Name}(");
-
-                for (int i = 0; i < method.Arguments.Length; i++)
-                {
-                    builder.Append($"{method.Arguments[i]}");
-
-                    if (i != method.Arguments.Length - 1)
-                    {
-                        builder.Append(", ");
-                    }
-                }
-
-                builder.AppendLine("):");
-
-                int pad = 6;
                 foreach (var inst in method.Instructions)
                 {
                     lineBuilder.Clear();
-
                     //
                     // @TODO This is a temp solution to a tailing binary dump of the 
                     // method that we should not even parse.
                     //
                     if (inst.Instruction == null) continue;
 
-                    var offset = pad - inst.Instruction.Length;
-                    if (offset < 0) offset = 0;
-
-                    var hexAddrSize = inst.Address.ToString("X");
-                    int hexSize = 4;
-
-                    string hexPad = new string('0', hexSize - hexAddrSize.Length);
-
                     lineBuilder.Append("  ");
-
+                    //
+                    // Append Jump Guides if needed.
+                    //
                     if (unit.Options.ShowGuides)
                     {
-                        AppendGuides(lineBuilder, inst, sizeAndNesting);
+                        writer.AppendGuides(lineBuilder, inst, sizeAndNesting);
                     }
-                    lineBuilder.Append($"{hexPad}{hexAddrSize}: ");
-                    lineBuilder.Append($"{inst.Instruction} " + new string(' ', offset));
+                    //
+                    // If the option to cut addresses was selected we should set the cut length
+                    // before we write out the address using this writer.
+                    //
+                    if (unit.Options.ShortAddresses)
+                        writer.AddressCutBy = unit.Options.AddressesCutByLength;
+                    //
+                    // Write out the address as a hex padded string.
+                    //
+                    writer.AppendInstructionAddress(lineBuilder, inst, zeroPad: true);
+                    writer.AppendInstructionName   (lineBuilder, inst);
 
                     int idx = 0;
                     foreach (var arg in inst.Arguments)
@@ -248,15 +234,11 @@ namespace PowerUp.Watcher
                     }
                     if (unit.Options.ShowASMDocumentation)
                     {
-                        unit.Options.ASMDocumentationOffset = 40;
                         AppendDocumentation(lineBuilder, method, inst, unit.Options);
                     }
                     builder.Append(lineBuilder.ToString());
                     builder.AppendLine();
                 }
-
-                builder.Append(lineBuilder.ToString());
-                builder.AppendLine();
             }
 
             return builder.ToString();

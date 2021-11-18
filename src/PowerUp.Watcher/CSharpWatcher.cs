@@ -399,8 +399,9 @@ namespace PowerUp.Watcher
 
         public string ToAsm(DecompilationUnit unit)
         {
-            StringBuilder builder = new StringBuilder();
-            StringBuilder lineBuilder = new StringBuilder();
+            var builder     = new StringBuilder();
+            var lineBuilder = new StringBuilder();
+            var writer      = new AssemblyWriter();
 
             builder.AppendLine();
 
@@ -416,58 +417,40 @@ namespace PowerUp.Watcher
 
                 (int jumpSize, int nestingLevel) sizeAndNesting = (-1,-1);
                 sizeAndNesting = JumpGuideDetector.PopulateGuides(method);
-                
+
                 //
                 // Print messages.
                 //
-                if (method.Messages != null && method.Messages.Length > 0)
-                {
-                    builder.AppendLine(
-                        Environment.NewLine +
-                        string.Join(Environment.NewLine, method.Messages));
-                }
-
-                builder.AppendLine($"# Instruction Count: {method.Instructions.Count}; Code Size: {method.CodeSize}");
-                builder.Append($"{method.Return} {method.Name}(");
-
-                for (int i = 0; i < method.Arguments.Length; i++)
-                {
-                    builder.Append($"{method.Arguments[i]}");
-
-                    if (i != method.Arguments.Length - 1)
-                    {
-                        builder.Append(", ");
-                    }
-                }
-
-                builder.AppendLine("):");
-
-                int pad = 6;
+                writer.AppendMessages(builder, method);
+                //
+                // Write out method signature.
+                //
+                writer.AppendMethodSignature(builder, method);
 
                 foreach (var inst in method.Instructions)
                 {
                     lineBuilder.Clear();
 
-                    var offset = pad - inst.Instruction.Length;
-                    if (offset < 0) offset = 0;
 
                     lineBuilder.Append("  ");
-
+                    //
+                    // Append Jump Guides if needed.
+                    //
                     if (unit.Options.ShowGuides)
                     {
-                        AppendGuides(lineBuilder, inst, sizeAndNesting);
+                        writer.AppendGuides(lineBuilder, inst, sizeAndNesting);
                     }
-
+                    //
+                    // If the option to cut addresses was selected we should set the cut length
+                    // before we write out the address using this writer.
+                    //
                     if (unit.Options.ShortAddresses)
-                    {
-                        lineBuilder.Append($"{inst.Address.ToString("X").Substring(unit.Options.AddressesCutByLength)}: ");
-                    }
-                    else
-                    {
-                        lineBuilder.Append($"{inst.Address.ToString("X")}: ");
-                    }
-
-                    lineBuilder.Append($"{inst.Instruction} " + new string(' ', offset));
+                        writer.AddressCutBy = unit.Options.AddressesCutByLength;
+                    //
+                    // Write out the address as a hex padded string.
+                    //
+                    writer.AppendInstructionAddress(lineBuilder, inst, zeroPad: false);
+                    writer.AppendInstructionName(lineBuilder, inst);
 
                     int idx = 0;
                     foreach (var arg in inst.Arguments)
@@ -479,7 +462,8 @@ namespace PowerUp.Watcher
 
                     if (unit.Options.ShowASMDocumentation)
                     {
-                        AppendDocumentation(lineBuilder, method, inst, unit.Options);
+                        writer.DocumentationOffset = unit.Options.ASMDocumentationOffset;
+                        writer.AppendX86Documentation(lineBuilder, method, inst);
                     }
 
                     builder.Append(lineBuilder.ToString());
@@ -488,226 +472,6 @@ namespace PowerUp.Watcher
             }
 
             return builder.ToString();
-        }
-
-        private void AppendDocumentation(StringBuilder lineBuilder, DecompiledMethod method, AssemblyInstruction instruction, Core.Compilation.CompilationOptions options)
-        {
-            try
-            {
-                int lineOffset = options.ASMDocumentationOffset;
-                if (lineBuilder.Length < lineOffset)
-                {
-                    lineBuilder.Append(' ', lineOffset - lineBuilder.Length);
-                }
-                if (instruction.Instruction == "mov")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-                    lineBuilder.Append($" # {lhs} = {rhs}");
-                }
-                else if (instruction.Instruction == "movsxd")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
-                    if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
-
-                    lineBuilder.Append($" # {lhs} = {rhs}");
-                }
-                else if (instruction.Instruction == "lea")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = rhs.Replace("[", "").Replace("]", ""); }
-                    lineBuilder.Append($" # {lhs} = {rhs}");
-                }
-                else if (instruction.Instruction == "inc")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    lineBuilder.Append($" # {lhs}++");
-                }
-                else if (instruction.Instruction == "call")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-
-                    if (lhs.StartsWith("CORINFO") && lhs.EndsWith("FAIL"))
-                    {
-                        lineBuilder.Append($" # throw");
-                    }
-                }
-                else if (instruction.Instruction == "add")
-                {
-                    string stackInfo = "";
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (IsHex(rhs))
-                        rhs = HexToDecimal(rhs);
-
-                    if (lhs == "rsp")
-                        stackInfo = $"stack.pop({rhs})";
-
-                    lineBuilder.Append($" # {lhs} += {rhs} {stackInfo}");
-                }
-                else if (instruction.Instruction == "sub")
-                {
-                    string stackInfo = "";
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (IsHex(rhs))
-                        rhs = HexToDecimal(rhs);
-
-                    if (lhs == "rsp")
-                        stackInfo = $"stack.push({rhs})";
-
-                    lineBuilder.Append($" # {lhs} -= {rhs} {stackInfo}");
-                }
-                else if (instruction.Instruction == "xor")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (IsHex(rhs))
-                        rhs = HexToDecimal(rhs);
-
-                    if (lhs == rhs)
-                        lineBuilder.Append($" # {lhs} = 0");
-                    else
-                        lineBuilder.Append($" # {lhs} ^= {rhs}");
-                }
-                else if (instruction.Instruction == "ret")
-                {
-                    lineBuilder.Append($" # return;");
-                }
-                else if (instruction.Instruction == "cmp")
-                {
-                    if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
-                    {
-                        string @operator = "NA";
-                        var inst = instruction;
-                        var next = method.Instructions[instruction.OrdinalIndex + 1];
-
-                        var lhs = instruction.Arguments[0].Value.Trim();
-                        var rhs = instruction.Arguments[1].Value.Trim();
-
-                        if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                        if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                        if (IsHex(rhs))
-                            rhs = HexToDecimal(rhs);
-
-                        @operator = SetOperatorForASMDocs(next);
-                        lineBuilder.Append($" # if({lhs} {@operator} {rhs})");
-                    }
-                }
-                else if (instruction.Instruction == "test")
-                {
-                    if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
-                    {
-                        string @operator = "NA";
-                        var inst = instruction;
-                        var next = method.Instructions[instruction.OrdinalIndex + 1];
-                        @operator = SetOperatorForASMDocs(next);
-                        lineBuilder.Append($" # if({inst.Arguments[0].Value.Trim()} & {inst.Arguments[1].Value} {@operator} 0)");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                //
-                // Ignore this error, we don't want to crash the output if documentaton
-                // blows up.
-                //
-                // Log it to the console and move on.
-                //
-                XConsole.WriteLine($"'Documentation Generation Failed with message: {ex.Message}'");
-            }
-        }
-
-        private bool IsHex(string value)
-        { 
-            if(value != null)
-            {
-                return char.IsDigit(value[0]) && value[value.Length - 1] == 'h';
-            }
-            return false;
-        }
-
-        private string HexToDecimal(string value)
-        {
-            var hexEssence = value.Substring(0, value.Length - 1);
-            int decValue = Convert.ToInt32(hexEssence, 16);
-            return decValue.ToString();
-        }
-
-        private string SetOperatorForASMDocs(AssemblyInstruction instruction)
-        {
-            return instruction.Instruction switch
-            {
-                "je" => "==",
-                "jne" => "!=",
-                "jl" => "<",
-                "jg" => ">",
-                "jle" => "<=",
-                "jge" => ">=",
-                //
-                // Unsigned
-                //
-                "jae" => ">=",
-                "jbe" => "<=",
-                "ja" => ">",
-                "jb" => "<",
-
-                _ => "NA"
-            };
-        }
-
-        private void AppendGuides(StringBuilder builder, AssemblyInstruction inst, (int jumpSize, int nestingLevel) sizeAndNesting)
-        {
-            int wsCount = 0;
-            bool usedGuides = false;
-            for (int i = 0; i <= sizeAndNesting.nestingLevel; i++)
-            {
-                var block = inst.GuideBlocks[i];
-
-                //
-                // Guide not found, append whitespace.
-                // @TODO: Most of this stuff is done when we're populating guides
-                // This loop should be as simple as possible.
-                //
-                if (block == '\0') wsCount++;
-                else
-                {
-                    if (wsCount > 0) builder.Append(new String(' ', wsCount));
-                    wsCount = 0;
-                    builder.Append((char)block);
-                    usedGuides = true;
-                }
-            }
-
-            if (sizeAndNesting.nestingLevel > 0 && usedGuides == false)
-                builder.Append(' ', sizeAndNesting.nestingLevel);
         }
 
         private string CreateArgument(ulong methodAddress, ulong codeSize, AssemblyInstruction instruction, InstructionArg arg, bool isLast, Core.Compilation.CompilationOptions options)
