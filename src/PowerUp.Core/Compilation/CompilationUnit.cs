@@ -27,7 +27,7 @@ namespace PowerUp.Core.Compilation
         public bool ShowASMDocumentation { get; set; }
         public int ASMDocumentationOffset { get; set; } = 45;
         public bool ShowSourceMaps { get; set; }
-
+        public int OptimizationLevel { get; set; }
         public CompilationOptions() { }
     }
 }

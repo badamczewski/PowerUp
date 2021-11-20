@@ -115,20 +115,11 @@ namespace PowerUp.Watcher
                             var code = File.ReadAllText(goFile);
                             if (string.IsNullOrEmpty(code) == false && lastCode != code)
                             {
+                                lastCode = code;
                                 XConsole.WriteLine($"Calling: {command}");
 
-                                System.Diagnostics.Process process = new System.Diagnostics.Process();
-                                System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
-                                startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-                                startInfo.FileName = "cmd.exe";
-                                startInfo.Arguments = $"/C {command}";
-                                process.StartInfo = startInfo;
-                                process.Start();
-                                process.WaitForExit();
-
-                                lastCode = code;
-
-                                var options = ProcessCommandOptions(code);
+                                WatcherUtils.StartCompilerProcess(command);
+                                var options = WatcherUtils.ProcessCommandOptions(code);
                                 var methods = ParseASM(File.ReadAllText(tmpAsmFile));
 
                                 var unit = new DecompilationUnit() 
@@ -157,22 +148,6 @@ namespace PowerUp.Watcher
                 }
             });
             return iDontCareAboutThisTask;
-        }
-
-        private CompilationOptions ProcessCommandOptions(string asm)
-        {
-            CompilationOptions options = new CompilationOptions();
-            if(asm.IndexOf("//up:showGuides") != -1)
-            {
-                options.ShowGuides = true;
-            }
-
-            if(asm.IndexOf("//up:showASMDocs") != -1)
-            {
-                options.ShowASMDocumentation = true;
-            }
-
-            return options;
         }
 
         public string ToAsmString(DecompilationUnit unit)

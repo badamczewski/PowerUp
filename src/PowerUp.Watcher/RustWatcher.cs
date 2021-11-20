@@ -53,7 +53,8 @@ namespace PowerUp.Watcher
             var tmpAsmFile = outAsmFile + "_tmp.asm";
             var command = $"{_pathToCompiler}rustc.exe {inputFile} -o {tmpAsmFile} " +
                 "-C debuginfo=1 " +
-                $"--emit asm --crate-type rlib -Cllvm-args=--x86-asm-syntax=intel -C opt-level=3";
+                $"--emit asm --crate-type rlib -Cllvm-args=--x86-asm-syntax=intel";
+
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
             var iDontCareAboutThisTask = Task.Run(async () =>
@@ -68,20 +69,16 @@ namespace PowerUp.Watcher
                             var code = File.ReadAllText(inputFile);
                             if (string.IsNullOrEmpty(code) == false && lastCode != code)
                             {
-                                XConsole.WriteLine($"Calling: {command}");
-
-                                System.Diagnostics.Process process = new System.Diagnostics.Process();
-                                System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
-                                startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-                                startInfo.FileName = "cmd.exe";
-                                startInfo.Arguments = $"/C {command}";
-                                process.StartInfo = startInfo;
-                                process.Start();
-                                process.WaitForExit();
-
                                 lastCode = code;
 
-                                var options = ProcessCommandOptions(code);
+                                var options = WatcherUtils.ProcessCommandOptions(code);
+                                var commandToCall = command;
+
+                                if (options.OptimizationLevel > 0)
+                                    commandToCall += $" -C opt-level={options.OptimizationLevel}";
+
+                                XConsole.WriteLine($"Calling: {commandToCall}");
+                                WatcherUtils.StartCompilerProcess(commandToCall);
                                 var methods = ParseASM(
                                     Path.GetFileNameWithoutExtension(inputFile), 
                                     File.ReadAllText(tmpAsmFile),
@@ -94,7 +91,6 @@ namespace PowerUp.Watcher
                                 };
 
                                 var asmCode = ToAsmString(unit);
-
                                 File.WriteAllText(outAsmFile, asmCode);
 
                             }
@@ -260,28 +256,6 @@ namespace PowerUp.Watcher
             }
 
             return builder.ToString();
-        }
-
-        private CompilationOptions ProcessCommandOptions(string asm)
-        {
-            CompilationOptions options = new CompilationOptions();
-            if (asm.IndexOf("//up:showGuides") != -1)
-            {
-                options.ShowGuides = true;
-            }
-
-            var docsIndex = asm.IndexOf("//up:showASMDocs");
-            if (docsIndex != -1)
-            {
-                options.ShowASMDocumentation = true;
-            }
-
-            if(asm.IndexOf("//up:showSource") != -1)
-            {
-                options.ShowSourceMaps = true;
-            }
-
-            return options;
         }
 
         private DecompiledMethod[] ParseASM(string fileName, string asm, string code)
