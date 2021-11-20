@@ -51,7 +51,9 @@ namespace PowerUp.Watcher
             Initialize(inputFile, outAsmFile);
 
             var tmpAsmFile = outAsmFile + "_tmp.asm";
-            var command = $"{_pathToCompiler}rustc.exe {inputFile} -o {tmpAsmFile} --emit asm --crate-type rlib -Cllvm-args=--x86-asm-syntax=intel -C opt-level=3";
+            var command = $"{_pathToCompiler}rustc.exe {inputFile} -o {tmpAsmFile} " +
+                "-C debuginfo=1 " +
+                $"--emit asm --crate-type rlib -Cllvm-args=--x86-asm-syntax=intel -C opt-level=3";
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
             var iDontCareAboutThisTask = Task.Run(async () =>
@@ -82,7 +84,8 @@ namespace PowerUp.Watcher
                                 var options = ProcessCommandOptions(code);
                                 var methods = ParseASM(
                                     Path.GetFileNameWithoutExtension(inputFile), 
-                                    File.ReadAllText(tmpAsmFile));
+                                    File.ReadAllText(tmpAsmFile),
+                                    code);
 
                                 var unit = new DecompilationUnit()
                                 {
@@ -141,6 +144,7 @@ namespace PowerUp.Watcher
                     // method that we should not even parse.
                     //
                     if (inst.Instruction == null) continue;
+                    if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
 
                     lineBuilder.Append("  ");
                     //
@@ -159,9 +163,11 @@ namespace PowerUp.Watcher
                     //
                     // Write out the address as a hex padded string.
                     //
+                    // If this is a source map code line then obviously let's not include the address.
+                    //
                     writer.AppendInstructionAddress(lineBuilder, inst, zeroPad: true);
                     writer.AppendInstructionName(lineBuilder, inst);
-
+                    
                     int idx = 0;
                     foreach (var arg in inst.Arguments)
                     {
@@ -264,15 +270,21 @@ namespace PowerUp.Watcher
                 options.ShowGuides = true;
             }
 
-            if (asm.IndexOf("//up:showASMDocs") != -1)
+            var docsIndex = asm.IndexOf("//up:showASMDocs");
+            if (docsIndex != -1)
             {
                 options.ShowASMDocumentation = true;
+            }
+
+            if(asm.IndexOf("//up:showSource") != -1)
+            {
+                options.ShowSourceMaps = true;
             }
 
             return options;
         }
 
-        private DecompiledMethod[] ParseASM(string fileName, string asm)
+        private DecompiledMethod[] ParseASM(string fileName, string asm, string code)
         {
             //
             // Functions in rust asm have a simple way of detecting them,
@@ -302,11 +314,14 @@ namespace PowerUp.Watcher
             // 
             // We shall skip everything else and parse instructions only to a new empty line.
             //
+
+            var codeLines = code.Split("\n");
+
             var lines = asm
                 .Trim()
                 .Split("\n");
 
-            Dictionary<string,ulong> labels = new Dictionary<string, ulong>();
+            Dictionary<string,ulong> labels  = new Dictionary<string, ulong>();
             List<DecompiledMethod>   methods = new List<DecompiledMethod>();
             DecompiledMethod decompiledMethod = null;
             int index = 0;
@@ -333,8 +348,60 @@ namespace PowerUp.Watcher
                     SetJumpsBasedOnLabels(decompiledMethod, labels);
                     decompiledMethod = null;
                 }
+                else if(line.StartsWith(".cv_loc"))
+                {
+                    //
+                    // The label called .cv_loc is a source map instruction.
+                    //
+                    // These lables are not as usefull as you might think
+                    // since they don't map well to rust code when we compile with optimizations
+                    // and they provide minimal support, but regardless if we have them in the asm,
+                    // then we should use them.
+                    //
+                    // the cv label has four arguments:
+                    //    .cv_loc 0 1 16 0
+                    // 
+                    // 1. Func ID
+                    // 2. File ID
+                    // 3. Line in the Source File
+                    // 4. Position in the Source File
+                    //
+                    // We are mostly interested in argument (3), lets collect this into a source map
+                    // which pulls the source code from that line and inserts it instead of this instruction.
+                    // 
+                    // @NOTE: This is a temprary solution, but in order to not destroy the jump guides
+                    // we shall put the source code as an instruction.
+                    //
+
+                    //
+                    // Get only the third argument
+                    //
+                    var sourceCodeLine = GetSourceLineArg(line);
+
+                    if (sourceCodeLine < codeLines.Length)
+                    {
+                        var codeLine = codeLines[sourceCodeLine - 1];
+                        var instruction = new AssemblyInstruction();
+                        instruction.Instruction = codeLine.Trim();
+                        instruction.Arguments = new InstructionArg[0];
+                        instruction.IsCode = true;
+                        decompiledMethod.Instructions.Add(instruction);
+                        decompiledMethod.CodeSize = (uint)index;
+                        index++;
+                    }
+
+                }
                 else if (decompiledMethod != null)
                 {
+                    //
+                    // The instruction is a technical label, skip it.
+                    // JUMP Labels start with "LB"
+                    //
+                    if(line.StartsWith(".") && line.StartsWith(".LB") == false)
+                    {
+                        continue;
+                    }
+
                     var nameInst = ParseInstruction((ulong)index, line);
                     nameInst.OrdinalIndex = index;
                     decompiledMethod.Instructions.Add(nameInst);
@@ -350,6 +417,30 @@ namespace PowerUp.Watcher
 
             SetJumpsBasedOnLabels(decompiledMethod, labels);
             return methods.ToArray();
+        }
+
+        private int GetSourceLineArg(string line)
+        {
+            int argIndex   = 2;
+            int startIndex = -1;
+            int index      = 0;
+            for (; index < line.Length; index++)
+            {
+                if (line[index] == ' ')
+                {
+                    argIndex--;
+                    if (argIndex == 0 && startIndex == -1)
+                        startIndex = index;
+
+                    if (argIndex < 0)
+                        break;
+                }
+            }
+
+            if(startIndex == -1)
+                return -1;
+
+            return int.Parse(line.Substring(startIndex + 1, index - startIndex - 1));
         }
 
         private void SetJumpsBasedOnLabels(DecompiledMethod decompiledMethod, Dictionary<string, ulong> labels)

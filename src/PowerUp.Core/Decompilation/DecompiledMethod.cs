@@ -90,7 +90,7 @@ namespace PowerUp.Core.Decompilation
         public JumpDirection jumpDirection { get; set; }
         public int JumpSize { get; set; } = -1;
         public int JumpIndex { get; set; } = -1;
-
+        public bool IsCode { get; set; }
     }
 
     public enum JumpDirection

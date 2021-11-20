@@ -53,6 +53,11 @@ namespace PowerUp.Watcher
 
         public void AppendInstructionAddress(StringBuilder lineBuilder, AssemblyInstruction inst, bool zeroPad = true)
         {
+            //
+            // Do nothing with code.
+            //
+            if (inst.IsCode) return;
+
             var address   = inst.Address.ToString("X");
             int cutBy     = AddressCutBy;
             string hexPad = null;
@@ -71,8 +76,7 @@ namespace PowerUp.Watcher
         {
             var offset = InstructionPad - inst.Instruction.Length;
             if (offset < 0) offset = 0;
-
-            lineBuilder.Append($"{inst.Instruction} " + new string(' ', offset));
+            lineBuilder.Append($"{(inst.IsCode ? "# " : "")}{inst.Instruction} " + new string(' ', offset));
         }
         public void AppendMethodSignature(StringBuilder methodBuilder, DecompiledMethod method)
         {
