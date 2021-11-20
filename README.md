@@ -1,6 +1,6 @@
 # PowerUp
 
-![powerUp2](https://user-images.githubusercontent.com/752380/140500855-988c87c9-b15b-438b-a44e-61f71c2a90a3.png)
+![powerup22](https://user-images.githubusercontent.com/752380/142743460-5827b232-f0ec-4240-9eaa-0947fcc3a87c.png)
 
 The purpose of this project is to provide productivity utilities and tools for multiple languages and platforms such as:
 
