@@ -2,28 +2,55 @@
 
 ![powerUp2](https://user-images.githubusercontent.com/752380/140500855-988c87c9-b15b-438b-a44e-61f71c2a90a3.png)
 
-The purpose of this library is to provide productivity utilities and tools such as:
+The purpose of this project is to provide productivity utilities and tools for multiple languages and platforms such as:
 
-* Live IDE Watcher.
-* JIT Dissasembler.
-* IL Compiler.
-* Quick Benchmark.
-* Console with rich formatting.
+* Live IDE Watcher (For C#, GO and Rust).
+* .NET JIT Dissasembler.
+* .NET IL Compiler.
+* .NET Quick Benchmark.
+* .NET Console with rich formatting.
 * Others.
 
 ## Live IDE Watcher
 
-A watcher application that monitors .cs and .il  files and compiles them with the JIT compiler to produce IL and X86 ASM outputs.
+A watcher application that monitors source code files and IR, IL files and compiles them and later decompiles and disassembles them to produce IL,IR and X86 ASM outputs. All compilers support multiple features such as Jump Guides, X86, IR Assembly documentation, Source Maps and more.
 
-![anim8](https://user-images.githubusercontent.com/752380/131903377-128dbec4-be8d-4455-acbd-50b9d86cebd5.gif)
+### C# Decompilation and dissasembly
 
-**I use this application daily to create infographics:** https://leveluppp.ghost.io/infographics/
+C# is the only language that supports (at the moment) running code, interactive mode, benchmarking and class and struct layouts.
+
+![power_up_cs_1](https://user-images.githubusercontent.com/752380/142741796-883cc8ac-259e-4e7b-9c76-624b8e3b7370.gif)
+
+This demo shows layouts feature:
+
+![power_up_cs_2](https://user-images.githubusercontent.com/752380/142742770-ee02faca-f1f9-448c-9e70-f635a147f671.gif)
+
+### GO Decompilation
+
+GO Lang is not disassembled to X86 asm, but GO-specific IR is almost a 1-to-1 assembly, so most optimizations have already happened. This makes this type of IR format viable for performance analysis.
+
+![power_up_go_1](https://user-images.githubusercontent.com/752380/142741977-dd8e038a-c6a1-425a-bb07-5241762dfd14.gif)
+
+### Rust Dissasembly
+
+Rust being a LLVM based language will support default compiler flags like optimization levels and source code maps. (This feature will be also added to c# and GO with time)
+
+![power_up_rs_1](https://user-images.githubusercontent.com/752380/142742163-5c4907ad-754c-41b0-bc40-e8ad05288aa2.gif)
+
+### .NET IL Compilation
 
 Note: IL Compilation is still a work in progress, and it will take some time before it's robust.
 
 ![anim10](https://user-images.githubusercontent.com/752380/131910137-70f0ee68-b4fa-4bf3-b727-1a4ddaf86384.gif)
 
-## JIT Dissasembler
+**I use this application daily to create infographics:** https://leveluppp.ghost.io/infographics/
+
+If you would like to see more features, there's a Youtube video showing more features in detail:
+
+https://www.youtube.com/watch?v=EZV_9sCrptc
+
+
+## .NET JIT Dissasembler
 
 To disassemble JIT code, you need to extract the method info using reflection and call the extension method ToAsm(). This will get native assembly code in tier0. To get a higher Tier, you need to provide the delegate that will call the method, and over time the compiler will re-JIT it to Tier1. If you want to skip this, you can compile your project with:  
 
@@ -52,7 +79,7 @@ Example for Tier1:
 
 There are no guarantees that Tier1 will always be available; Very short and fast methods tend not to be promoted (I'm working on a fix). Code that contains loops is always optimized so you should not bother with this method and switch back to the simpler version.
 
-## IL Compiler 
+## .NET IL Compiler 
 
 You can write IL Code as a string and compile it to a type; later, it can be fed to the JIT Decompiler. Native IL compilation is an interesting research topic since you can emit instructions that are not used or used in a completely different context.
 
@@ -74,7 +101,7 @@ You can write IL Code as a string and compile it to a type; later, it can be fed
    asm.Print();
 ```
 
-## Quick Benchmark
+## .NET Quick Benchmark
 
 To create a valid benchmark that tests various examples and it's accurate, one needs to go to great lengths, and there are multiple libraries for that already. This Quick Benchmark is suitable for running only on a single method and test performance; it's handy for live demos, slides, videos, etc. 
 
