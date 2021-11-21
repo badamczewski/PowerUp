@@ -97,11 +97,15 @@ If you would like to see more features, there's a Youtube video showing more fea
 
 https://www.youtube.com/watch?v=EZV_9sCrptc
 
+### Look and Feel
+
 To make your outputs look nice in Visual Studio Code or any other editor, you must install an X86 assembly syntax.
 
 I use a modified version of the 13xforever X86 ASM syntax: https://github.com/13xforever/x86-assembly-textmate-bundle
 (I hope to be able to bundle it with this tool)
 
+
+Additionally you will need *Cascadia Mono* for nice guides and other features.
 
 ## .NET JIT Dissasembler
 
