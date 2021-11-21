@@ -15,6 +15,23 @@ The purpose of this project is to provide productivity utilities and tools for m
 
 A watcher application that monitors source code files and IR, IL files and compiles them and later decompiles and disassembles them to produce IL,IR and X86 ASM outputs. All compilers support multiple features such as Jump Guides, X86, IR Assembly documentation, Source Maps and more.
 
+### Running
+
+To run the application, you need to compile Power.Up watcher and run it from the terminal by providing the correct compiler(s) and providing input and output files like so:
+
+```
+.\PowerUp.Watcher.exe -rs D:\01_BA\PowerUp\_code.rs D:\01_BA\PowerUp\_outRust.asm
+```
+
+The application supports running multiple compilers at the same time:
+
+```
+.\PowerUp.Watcher.exe -rs D:\01_BA\PowerUp\_code.rs D:\01_BA\PowerUp\_outRust.asm -go D:\01_BA\PowerUp\_code.go D:\01_BA\PowerUp\_outGO.asm -cs D:\01_BA\PowerUp\_code.cs D:\01_BA\PowerUp\_out6.asm D:\01_BA\PowerUp\_out6.il
+```
+
+![obraz](https://user-images.githubusercontent.com/752380/142760629-f0d84b83-5357-40b4-8b2b-f221aca1bb99.png)
+
+
 ### C# Decompilation and dissasembly
 
 C# is the only language that supports (at the moment) running code, interactive mode, benchmarking and class and struct layouts.
@@ -25,17 +42,48 @@ This demo shows layouts feature:
 
 ![power_up_cs_2](https://user-images.githubusercontent.com/752380/142742770-ee02faca-f1f9-448c-9e70-f635a147f671.gif)
 
+C# supports multiple attributes that can be used to control compilation:
+
+```
+[Bench]       <- Used on a method to Benchmak source code, the method needs to have no input arguments.
+[Run]         <- Used on a method to Run source code, the method needs to have no input arguments.
+Print(X)      <- This is a C# function that is used to print values when the code uses the Run attribuute
+[ShowGuides]  <- Used on Any to enable jump guides in the ASM outputs.
+[ShowASMDocs] <- Used on Any to turn on ASM code documentation.
+[ShowASMDocs(offset={X}) <- Used on Any to turn on ASM code documentation. The offset argument controls the offset from ASM code where the docs are rendered.
+[ShortAddr]   <- Used on Any to have short address lines in the output ASM code.
+[ShortAddr(by={X})] <- Used on Any to have short address lines in the output ASM code. The additional argument is used to control the cut level. 
+```
+
 ### GO Decompilation
 
 GO Lang is not disassembled to X86 asm, but GO-specific IR is almost a 1-to-1 assembly, so most optimizations have already happened. This makes this type of IR format viable for performance analysis.
 
 ![power_up_go_1](https://user-images.githubusercontent.com/752380/142741977-dd8e038a-c6a1-425a-bb07-5241762dfd14.gif)
 
+GO supports multiple comment-level attributes that can be used to control compilation:
+
+```
+//up:showGuides       <- Used to enable jump guides in the ASM outputs.
+//up:showASMDocs      <- Used to turn on ASM code documentation.
+//up:showASMDocs offset = {X} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
+```
+
 ### Rust Dissasembly
 
 Rust being a LLVM based language will support default compiler flags like optimization levels and source code maps. (This feature will be also added to c# and GO with time)
 
 ![power_up_rs_1](https://user-images.githubusercontent.com/752380/142742163-5c4907ad-754c-41b0-bc40-e8ad05288aa2.gif)
+
+Rust supports multiple comment-level attributes that can be used to control compilation:
+
+```
+//up:showGuides       <- Used to enable jump guides in the ASM outputs.
+//up:showASMDocs      <- Used to turn on ASM code documentation.
+//up:showASMDocs offset = {X} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
+//up:optimization level = {X} <- Set the compilation optimization level (-C opt-level)
+//up:showCode         <- Show source code maps, that map assembly instructions to source code.
+```
 
 ### .NET IL Compilation
 
@@ -48,6 +96,11 @@ Note: IL Compilation is still a work in progress, and it will take some time bef
 If you would like to see more features, there's a Youtube video showing more features in detail:
 
 https://www.youtube.com/watch?v=EZV_9sCrptc
+
+To make your outputs look nice in Visual Studio Code or any other editor, you must install an X86 assembly syntax.
+
+I use a modified version of the 13xforever X86 ASM syntax: https://github.com/13xforever/x86-assembly-textmate-bundle
+(I hope to be able to bundle it with this tool)
 
 
 ## .NET JIT Dissasembler
