@@ -21,13 +21,14 @@ namespace PowerUp.Watcher
             process.Start();
             process.WaitForExit();
         }
-        
+
         //
         // @TODO: BA Move this to it's own class once we expose more complex options
         // and parsing.
         //
         public static CompilationOptions ProcessCommandOptions(string code)
         {
+
             XConsoleTokenizer xConsoleTokenizer = new XConsoleTokenizer();
             var tokens = xConsoleTokenizer.Tokenize(code);
             //

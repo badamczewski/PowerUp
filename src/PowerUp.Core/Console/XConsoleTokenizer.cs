@@ -23,6 +23,7 @@ namespace PowerUp.Core.Console
             int line = 1;
             int offset = 0;
             int i = 0;
+            int itterationCount = input.Length;
 
             while (i < input.Length)
             {
@@ -101,6 +102,13 @@ namespace PowerUp.Core.Console
                     i++;
                     offset++;
                 }
+
+                //
+                // Get out of the loop and throw.
+                //
+                itterationCount--;
+                if (itterationCount == 0)
+                    throw new Exception("Tokenizer is in an infinite loop");
             }
 
             return tokens;
@@ -315,6 +323,7 @@ namespace PowerUp.Core.Console
                     IsBracketClose(c)  ||
                     IsBracketOpen(c)   ||
                     IsSeparator(c)     ||
+                    IsOperator(i)      ||
                     (char.IsLetter(c) == false &&
                      char.IsDigit(c) == false  &&
                      char.IsPunctuation(c) == false &&
