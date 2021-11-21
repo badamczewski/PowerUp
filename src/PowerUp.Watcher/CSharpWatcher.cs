@@ -122,21 +122,16 @@ namespace PowerUp.Watcher
                             if (string.IsNullOrEmpty(code) == false && lastCode != code)
                             {
                                 DecompilationUnit unit = null;
-                                var compilation = _compiler.Compile(code);
-
                                 XConsole.WriteLine($"Decompiling: {csharpFile}");
 
                                 if (fileInfo.Extension == ".il")
                                 {
-                                    unit = DecompileIL(code);
+                                    unit = DecompileToIL(code);
                                 }
                                 else
                                 {
-                                    unit = Decompile(code);
+                                    unit = DecompileToASM(code);
                                 }
-
-                                unit.Options = compilation.CompilationOptions;
-                                unit.Options = WatcherUtils.SetCommandOptions(code, unit.Options);
 
                                 lastWrite = fileInfo.LastWriteTime;
                                 lastCode = code;
@@ -167,7 +162,7 @@ namespace PowerUp.Watcher
                                     }
                                     if (unit.ILCode != null)
                                     {
-                                        ilCode = ToIL(unit);
+                                        ilCode = ToILString(unit);
                                     }
 
                                     //
@@ -204,7 +199,7 @@ namespace PowerUp.Watcher
             return iDontCareAboutThisTask;
         }
 
-        public string ToIL(DecompilationUnit unit)
+        public string ToILString(DecompilationUnit unit)
         {
             StringBuilder builder = new StringBuilder();
             builder.AppendLine();
@@ -546,7 +541,7 @@ namespace PowerUp.Watcher
             return builder.ToString();
         }
 
-        public DecompilationUnit DecompileIL(string code)
+        public DecompilationUnit DecompileToIL(string code)
         {
             var decompilationUnit = new DecompilationUnit();
             var compilationUnit   = _iLCompiler.Compile(code);
@@ -570,18 +565,30 @@ namespace PowerUp.Watcher
             return decompilationUnit;
         }
 
-        public DecompilationUnit Decompile(string code)
+        public DecompilationUnit DecompileToASM(string code)
         {
             var unit = new DecompilationUnit();
+            //
+            // Compile the Source Code and set both the Compiler Options
+            // and options as comments.
+            //
+            var compilation     = _compiler.Compile(code);
+            compilation.Options = WatcherUtils.SetCommandOptions(code, compilation.Options);
+            unit.Options        = compilation.Options;
 
-            var compilation = _compiler.Compile(code);
             var compilationResult = compilation.CompilationResult;
             var assemblyStream = compilation.AssemblyStream;
             var pdbStream = compilation.PDBStream;
 
             XConsole.WriteLine($"Language Version: `{compilation.LanguageVersion}`");
 
-            using (var ctx = new CollectibleAssemblyLoadContext(_unsafeUseTieredCompilation == false))
+            //
+            // Create the collectible load context. This context will only compile to non-tiered
+            // Optimized compilation if the collectible option is set to true, so we are leaving it
+            // set to true, but if the compilation option is set to 1 then we will treat is as Debug
+            // and change the flag, anything else is considered a Release No-Tier build.
+            //
+            using (var ctx = new CollectibleAssemblyLoadContext(_unsafeUseTieredCompilation == false && compilation.Options.OptimizationLevel != 1))
             {
                 if (compilation.CompilationResult.Success == false)
                 {

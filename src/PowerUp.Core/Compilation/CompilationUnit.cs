@@ -16,7 +16,7 @@ namespace PowerUp.Core.Compilation
         public MemoryStream PDBStream { get; set; }
         public EmitResult CompilationResult { get; set; }
         public string LanguageVersion { get; set; }
-        public CompilationOptions CompilationOptions { get; set; } = new CompilationOptions();    
+        public CompilationOptions Options { get; set; } = new CompilationOptions();    
     }
 
     public class CompilationOptions

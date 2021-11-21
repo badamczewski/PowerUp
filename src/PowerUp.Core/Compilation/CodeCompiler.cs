@@ -67,7 +67,7 @@ namespace PowerUp.Core.Compilation
                 PDBStream = pdbStream,
                 CompilationResult = compilationResult,
                 LanguageVersion = compilation.LanguageVersion.ToDisplayString(),
-                CompilationOptions = options
+                Options = options
             };
         }
 
