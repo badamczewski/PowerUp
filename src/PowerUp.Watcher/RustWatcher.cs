@@ -117,6 +117,12 @@ namespace PowerUp.Watcher
             var lineBuilder = new StringBuilder();
             var writer      = new AssemblyWriter();
 
+            if (unit.Options.ShowHelp)
+            {
+                writer.AppendHelp(builder);
+                return builder.ToString();
+            }
+
             foreach (var method in unit.DecompiledMethods)
             {
                 if (method == null) continue;

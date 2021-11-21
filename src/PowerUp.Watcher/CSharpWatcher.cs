@@ -136,6 +136,7 @@ namespace PowerUp.Watcher
                                 }
 
                                 unit.Options = compilation.CompilationOptions;
+                                unit.Options = WatcherUtils.SetCommandOptions(code, unit.Options);
 
                                 lastWrite = fileInfo.LastWriteTime;
                                 lastCode = code;
@@ -162,7 +163,7 @@ namespace PowerUp.Watcher
                                 {
                                     if (unit.DecompiledMethods != null)
                                     {
-                                        asmCode = ToAsm(unit);
+                                        asmCode = ToAsmString(unit);
                                     }
                                     if (unit.ILCode != null)
                                     {
@@ -397,11 +398,17 @@ namespace PowerUp.Watcher
             return layoutBuilder.ToString();
         }
 
-        public string ToAsm(DecompilationUnit unit)
+        public string ToAsmString(DecompilationUnit unit)
         {
             var builder     = new StringBuilder();
             var lineBuilder = new StringBuilder();
             var writer      = new AssemblyWriter();
+
+            if(unit.Options.ShowHelp)
+            {
+                writer.AppendHelp(builder);
+                return builder.ToString();
+            }
 
             builder.AppendLine();
 

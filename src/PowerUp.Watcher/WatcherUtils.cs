@@ -10,6 +10,21 @@ namespace PowerUp.Watcher
 {
     public class WatcherUtils
     {
+        public struct UpCommand
+        {
+            public string Name { get; set; }
+            public string Description { get; set; }
+            public string[] Args { get; set; } = Array.Empty<string>();
+            public static UpCommand Create(string name, string description = null)
+            {
+                return new UpCommand() { Name = name, Description = description };
+            }
+            public static UpCommand Create(string name, string description, params string[] args)
+            {
+                return new UpCommand() { Name = name, Description = description, Args = args };
+            }
+        }
+
         public static void StartCompilerProcess(string command)
         {
             System.Diagnostics.Process process = new System.Diagnostics.Process();
@@ -23,12 +38,25 @@ namespace PowerUp.Watcher
         }
 
         //
+        // This array contains all of the up:commands
+        // that we curently support, the list is different
+        // for each compiler.
+        //
+        public static UpCommand[] upCommands = {
+            UpCommand.Create("up:showGuides",   "Used to enable jump guides in the ASM outputs."),
+            UpCommand.Create("up:showASMDocs",  "Used to turn on ASM code documentation.",        new[] { "offset" }),
+            UpCommand.Create("up:optimization", "Used to set the compilation optimization level", new[] { "level" }),
+            UpCommand.Create("up:shortAddr",    "Used to turn on ASM code documentation.",        new[] { "by" }),
+            UpCommand.Create("up:showCode",     "Used to show source code maps, that map assembly instructions to source code."),
+            UpCommand.Create("up:showHelp",     "Used to show help.")
+        };
+
+        //
         // @TODO: BA Move this to it's own class once we expose more complex options
         // and parsing.
         //
-        public static CompilationOptions ProcessCommandOptions(string code)
+        public static CompilationOptions SetCommandOptions(string code, CompilationOptions optionsToSet)
         {
-
             XConsoleTokenizer xConsoleTokenizer = new XConsoleTokenizer();
             var tokens = xConsoleTokenizer.Tokenize(code);
             //
@@ -41,19 +69,22 @@ namespace PowerUp.Watcher
             // 
             // The main goal of this format was parsing simplicity.
             //
-            CompilationOptions options = new CompilationOptions();
-
             for (int i = 0; i < tokens.Count; i++)
             {
                 var token = tokens[i];
                 var value = token.GetValue();
+
+                if(value == "up:showHelp")
+                {
+                    optionsToSet.ShowHelp = true;
+                }
                 if (value == "up:showGuides")
                 {
-                    options.ShowGuides = true;
+                    optionsToSet.ShowGuides = true;
                 }
                 else if (value == "up:showSource")
                 {
-                    options.ShowSourceMaps = true;
+                    optionsToSet.ShowSourceMaps = true;
                 }
                 //
                 // This is compiler specific.
@@ -66,27 +97,45 @@ namespace PowerUp.Watcher
                         var argValue = ParseCommandArgument(tokens, i + 2, "level");
                         if (argValue != null)
                         {
-                            options.OptimizationLevel = int.Parse(argValue);
+                            optionsToSet.OptimizationLevel = int.Parse(argValue);
                         }
                     }
                 }
                 else if (value == "up:showASMDocs")
                 {
-                    options.ShowASMDocumentation = true;
+                    optionsToSet.ShowASMDocumentation = true;
                     // i + 1 = whitespace; i + 2 = word?
                     if (i + 2 < tokens.Count)
                     {
                         var argValue = ParseCommandArgument(tokens, i + 2, "offset");
                         if (argValue != null)
                         {
-                            options.ASMDocumentationOffset = int.Parse(argValue);
+                            optionsToSet.ASMDocumentationOffset = int.Parse(argValue);
                         }
                     }
                 }
-
+                else if (value == "up:shortAddr")
+                {
+                    optionsToSet.ShortAddresses = true;
+                    // i + 1 = whitespace; i + 2 = word?
+                    if (i + 2 < tokens.Count)
+                    {
+                        var argValue = ParseCommandArgument(tokens, i + 2, "by");
+                        if (argValue != null)
+                        {
+                            optionsToSet.AddressesCutByLength = int.Parse(argValue);
+                        }
+                    }
+                }
             }
 
-            return options;
+            return optionsToSet;
+        }
+
+        public static CompilationOptions ProcessCommandOptions(string code)
+        {
+            var options = new CompilationOptions();
+            return SetCommandOptions(code, options);
         }
 
         private static string ParseCommandArgument(List<Token> tokens, int index, string name)

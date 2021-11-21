@@ -51,6 +51,25 @@ namespace PowerUp.Watcher
         public int AddressCutBy { get; set; } = 0;
         public int DocumentationOffset { get; set; } = 40;
 
+        public void AppendHelp(StringBuilder helpBuilder)
+        {
+            var sep = new string(XConsole.ConsoleBorderStyle.TopBottom, 20);
+            helpBuilder.AppendLine("# Help:");
+            foreach (var cmd in WatcherUtils.upCommands)
+            {
+                helpBuilder.AppendLine($"#   //{cmd.Name}");
+                helpBuilder.AppendLine($"#   {XConsole.ConsoleBorderStyle.BottomLeft}> {cmd.Description}");
+                if (cmd.Args.Length > 0)
+                {
+                    helpBuilder.AppendLine("#   Optional Arguments:");
+                    foreach (var arg in cmd.Args)
+                        helpBuilder.AppendLine($"#     {arg} = X");
+                }
+                helpBuilder.AppendLine($"#   " + sep);
+                helpBuilder.AppendLine();
+            }
+        }
+
         public void AppendInstructionAddress(StringBuilder lineBuilder, AssemblyInstruction inst, bool zeroPad = true)
         {
             //
