@@ -21,6 +21,11 @@ namespace PowerUp.Core.Compilation
 
     public class CompilationOptions
     {
+        //
+        // The compilation map, maps specific compilation instructions to language objects
+        // like methods, structs, classes fields and other.
+        //
+        public Dictionary<string, string> CompilationMap { get; set; } = new();
         public bool ShowHelp { get; set; }
         public bool ShowGuides { get; set; }
         public bool ShortAddresses { get; set; }

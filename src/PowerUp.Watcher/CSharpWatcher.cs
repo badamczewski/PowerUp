@@ -26,6 +26,7 @@ using PowerUp.Core.Console;
 using static PowerUp.Core.Console.XConsole;
 using System.Diagnostics;
 using TypeLayout = PowerUp.Core.Decompilation.TypeLayout;
+using System.Collections;
 
 namespace PowerUp.Watcher
 {
@@ -38,6 +39,10 @@ namespace PowerUp.Watcher
         private ILCompiler   _iLCompiler   = new ILCompiler();
 
         private bool _unsafeUseTieredCompilation = false;
+
+        // $env:DOTNET_TC_QuickJitForLoops = 1
+        // $env:DOTNET_TieredPGO = 1
+        private bool _isPGO = false; 
 
         public static bool IsDebug
         {
@@ -81,7 +86,40 @@ namespace PowerUp.Watcher
             if(Directory.Exists(_compiler.DotNetCoreDirPath) == false)
             {
                 XConsole.WriteLine($"'Cannot find the libs under Path: {_compiler.DotNetCoreDirPath}");
-            } 
+            }
+
+            //
+            // Check the DOTNET Enviroment variables and report them as well
+            // since they are special configuration flags that influence the ASM outputs
+            // like PGO and others.
+            //
+            XConsole.WriteLine("`.NET Enviromment variables:`");
+            var env = Environment.GetEnvironmentVariables();
+            foreach(DictionaryEntry entry in env)
+            {
+                //?? Will this ever happen
+                if (entry.Key != null)
+                {
+                    var key = entry.Key.ToString();
+                    if (key.StartsWith("DOTNET"))
+                    {
+                        XConsole.WriteLine($"  `{entry.Key}` = {entry.Value}");
+                        if(key == "DOTNET_TieredPGO")
+                        {
+                            _isPGO = true;
+                        }
+                        //
+                        // WE don't need it right now, we have collected it in the past
+                        // but I'm not sure if there's a good reason for it now.
+                        // TBD if this should go away for good.
+                        //
+                        //else if(key == "DOTNET_TC_QuickJitForLoops")
+                        //{
+                        //    _isQuickJITLoops = true;
+                        //}
+                    }
+                }
+            }
 
             XConsole.WriteLine($"`Language  Version`: {_compiler.LanguageVersion.ToDisplayString()}");
             XConsole.WriteLine($"`.NET Version`: {Environment.Version.ToString()}");
@@ -572,23 +610,23 @@ namespace PowerUp.Watcher
             // Compile the Source Code and set both the Compiler Options
             // and options as comments.
             //
-            var compilation     = _compiler.Compile(code);
+            var compilation = _compiler.Compile(code);
             compilation.Options = WatcherUtils.SetCommandOptions(code, compilation.Options);
-            unit.Options        = compilation.Options;
+            unit.Options = compilation.Options;
 
             var compilationResult = compilation.CompilationResult;
             var assemblyStream = compilation.AssemblyStream;
             var pdbStream = compilation.PDBStream;
 
             XConsole.WriteLine($"Language Version: `{compilation.LanguageVersion}`");
-
             //
             // Create the collectible load context. This context will only compile to non-tiered
             // Optimized compilation if the collectible option is set to true, so we are leaving it
             // set to true, but if the compilation option is set to 1 then we will treat is as Debug
             // and change the flag, anything else is considered a Release No-Tier build.
             //
-            using (var ctx = new CollectibleAssemblyLoadContext(_unsafeUseTieredCompilation == false && compilation.Options.OptimizationLevel != 1))
+            var isOptimizedOnly = _unsafeUseTieredCompilation == false && compilation.Options.OptimizationLevel != 1;
+            using (var ctx = new CollectibleAssemblyLoadContext(isOptimizedOnly))
             {
                 if (compilation.CompilationResult.Success == false)
                 {
@@ -604,30 +642,127 @@ namespace PowerUp.Watcher
                 else
                 {
                     assemblyStream.Position = 0;
-
                     var loaded = ctx.LoadFromStream(assemblyStream);
 
                     var compiledType = loaded.GetType("CompilerGen");
                     var decompiledMethods  = compiledType.ToAsm(@private: true);
                     var typesMemoryLayouts = compiledType.ToLayout(@private: true);
-
+                    //
+                    // Run operations such as Benchmarking, Running and Interactive printing.
+                    // Since we don't want these operations and generated methods to be ouptuted
+                    // to the IL and ASM outputs we need to hide them.
+                    //
                     RunPostCompilationOperations(loaded, compiledType, decompiledMethods);
-                    HideDecompiledMethods(decompiledMethods);
+                    HideInternalDecompiledMethods(decompiledMethods);
+
+                    List<DecompiledMethod> methods = new List<DecompiledMethod>();
+                    methods.AddRange(decompiledMethods);
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
+                    //
+                    // The code below creates a non collectible context (BAD) in order to be able to support
+                    // features like PGO, QuickJIT and other future features that will recompile the method
+                    // at lower Tier.
+                    //
+                    // Compile all of the methods in this type but collect only the ones that are on the list.
+                    // - For QuickJIT we simply compile again and that should give us the quick version.
+                    // - For PGO we need to run multiple times, but the idea here is that PGO methods need a Run or a Bench
+                    //   attribute since a profile needs to be collected, so we need to run post operations on this method,
+                    //   and hope that it will be optimized in time for us to show it.
+                    //
+                    using (var nestedCtx = new CollectibleAssemblyLoadContext(isCollectibleButAlwaysOptimized: false))
+                    {
+                        assemblyStream.Position = 0;
+                        loaded = nestedCtx.LoadFromStream(assemblyStream);
+                        //
+                        // Recompile the type using collectible context.
+                        // For Tiered Compilation this will produce the T0 QUICKJIT versions
+                        // of methods.
+                        //
+                        // For PGO it will also inject the histogram table counter.
+                        //
+                        compiledType      = loaded.GetType("CompilerGen");
+                        decompiledMethods = compiledType.ToAsm(@private: true);
+                        //
+                        // @NOTE: This is not optimial at all but for now let's go with this version since it's
+                        // simple top-bottom code.
+                        //
+                        // Get all of the T0 decompiled methods and find the ones that have any attributes
+                        // in the compilation map. QuickJIT methods are simple since we already have them so
+                        // let's add them as a new decompiled method to our existing list.
+                        // 
+                        // For PGO we need to run such method multiple times and switch stacks if possible
+                        // (to speed up the process) and only after we need to do another decompilation of the method
+                        // to be able to get the T1 PGO codegen.
+                        // 
+                        // Let's check if PGO was enabled before doing anything since there's no point in running any code
+                        // if the flag is not set.
+                        //
+                        var flags = BindingFlags.Public |
+                                    BindingFlags.Static | 
+                                    BindingFlags.Instance | 
+                                    BindingFlags.NonPublic;
+                        var methodInfos     = compiledType.GetMethods(flags);
+                        var methodInfosDict = methodInfos.ToDictionary(m => m.Name);
 
+                        foreach (var decompiledMethod in decompiledMethods)
+                        {
+                            if (unit.Options.CompilationMap.TryGetValue(decompiledMethod.Name, out var attribute))
+                            {
+                                if (attribute == "QuickJIT")
+                                {
+                                    //
+                                    // No work is needed for Quick JIT but it's good to add a message
+                                    // saying that it's Jitted.
+                                    //
+                                    decompiledMethod.Messages.Add("# QuickJIT");
+                                    methods.Add(decompiledMethod);
+                                }
+                                else if (attribute == "PGO")
+                                {
+                                    List<string> messages = new();
+                                    //
+                                    // If PGO is not enabled then don't even bother running any methods.
+                                    //
+                                    if (_isPGO)
+                                    {
+                                        RunPostCompilationOperations(loaded, compiledType, new[] { decompiledMethod });
+                                    }
+                                    else
+                                    {
+                                        messages.Add("# [WARN] PGO is Disabled");
+                                    }
+                                    //
+                                    // Decompile the method again
+                                    //
+                                    var afterPGO = methodInfosDict[decompiledMethod.Name].ToAsm();
+                                    afterPGO.Messages.AddRange(messages);
+                                    afterPGO.Messages.AddRange(decompiledMethod.Messages);
+                                    //
+                                    // Now we should have the optimal version of the code.
+                                    // Add it to the list.
+                                    // 
+                                    // @TODO @NOTE: For some unknown reason the PGO version is always slower then the Optimized
+                                    // version of the code, even when having a much better codegen.
+                                    // I don't know why this happend but we need to investigate this.
+                                    //
+                                    methods.Add(afterPGO);
+                                }
+                            }
+                        }
+                    }
                     ILDecompiler iLDecompiler = new ILDecompiler();
                     unit.ILCode = iLDecompiler.ToIL(assemblyStream, pdbStream);
-                    unit.DecompiledMethods = decompiledMethods;
+                    unit.DecompiledMethods = methods.ToArray();
                     unit.TypeLayouts = typesMemoryLayouts;
                 }
-
-                return unit;
             }
+
+            return unit;
         }
 
-        private void HideDecompiledMethods(DecompiledMethod[] methods)
+        private void HideInternalDecompiledMethods(DecompiledMethod[] methods)
         {
             //
             // Null the benchmark method so it's not displayed.
@@ -638,62 +773,69 @@ namespace PowerUp.Watcher
                 else if (methods[i].Name == "Print")      methods[i] = null;
             }
         }
+
         private void RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType, DecompiledMethod[] decompiledMethods)
+        {
+            var methods = compiledType.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+            RunPostCompilationOperations(loadedAssembly, decompiledMethods, methods);
+        }
+        private void RunPostCompilationOperations(Assembly loadedAssembly, DecompiledMethod[] decompiledMethods, MethodInfo[] methodInfos)
         {
             List<string> messages = new List<string>();
             int order = 1;
 
             var compiledLog = loadedAssembly.GetType("_Log");
-            var instance = loadedAssembly.CreateInstance("CompilerGen");
-            var methods = compiledType.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
-            foreach (var method in methods)
+            var instance    = loadedAssembly.CreateInstance("CompilerGen");
+            foreach (var method in methodInfos)
             {
                 if (method.Name.StartsWith("Bench_"))
                 {
-                    (long took, int warmUpCount, int runCount) summary = 
-                        ((long, int, int))method.Invoke(instance, null);
-
                     var methodUnderBenchmarkName = method.Name.Split("_")[1];
-
-                    messages.Add($"# [{order++}] ");
-                    messages.Add($"# Method: {methodUnderBenchmarkName}");
-                    messages.Add($"# Warm-up Count: {summary.warmUpCount} calls");
-                    messages.Add($"# Took {summary.took} ms / {summary.runCount} calls");
-                    messages.Add("# ");
-
-                    //
-                    // @TODO Refactor to something faster.
-                    //
                     var found = decompiledMethods.FirstOrDefault(x => x.Name == methodUnderBenchmarkName);
-                    if (found != null) found.Messages = messages.ToArray();
+                    if (found != null)
+                    {
+                        //
+                        // Find the method under benchmark to extract it's attribute values.
+                        //
 
-                    messages.Clear();
+                        (long took, int warmUpCount, int runCount) summary =
+                           ((long, int, int))method.Invoke(instance, null);
+
+                        messages.Add($"# [{order++}] ");
+                        messages.Add($"# Method: {methodUnderBenchmarkName}");
+                        messages.Add($"# Warm-up Count: {summary.warmUpCount} calls");
+                        messages.Add($"# Took {summary.took} ms / {summary.runCount} calls");
+                        messages.Add("# ");
+
+                        found.Messages.AddRange(messages);
+                        order++;
+
+                        messages.Clear();
+                    }
                 }
                 else
                 {
                     var attributes = method.GetCustomAttributes();
-                    foreach(var attribute in attributes)
+                    foreach (var attribute in attributes)
                     {
                         var name = attribute.GetType().Name;
 
                         if (name == "RunAttribute")
                         {
-                            method.Invoke(instance, null);
-                            var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
-
-                            messages.AddRange(log);
-
-                            //
-                            // @TODO Refactor to something faster.
-                            //
                             var found = decompiledMethods.FirstOrDefault(x => x.Name == method.Name);
+                            if (found != null)
+                            {
+                                method.Invoke(instance, null);
+                                var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
 
-                            if (found != null) found.Messages = messages.ToArray();
+                                messages.AddRange(log);
+                                found.Messages.AddRange(messages.ToArray());
+                                order++;
 
-                            messages.Clear();
-                            order++;
+                                messages.Clear();
+                            }
                         }
-                        else if(name == "HideAttribute")
+                        else if (name == "HideAttribute")
                         {
                             for (int i = 0; i < decompiledMethods.Length; i++)
                             {
@@ -705,7 +847,6 @@ namespace PowerUp.Watcher
                             }
                         }
                     }
-
                 }
             }
         }

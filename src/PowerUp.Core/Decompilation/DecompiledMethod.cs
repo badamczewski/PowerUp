@@ -53,7 +53,7 @@ namespace PowerUp.Core.Decompilation
 
         public uint CodeSize { get; set; }
         public ulong CodeAddress { get; set; }
-        public string[] Messages { get; set; } = Array.Empty<string>();
+        public List<string> Messages { get; set; } = new();
         public override string ToString()
         {
             StringBuilder builder = new StringBuilder();
@@ -91,6 +91,11 @@ namespace PowerUp.Core.Decompilation
         public int JumpSize { get; set; } = -1;
         public int JumpIndex { get; set; } = -1;
         public bool IsCode { get; set; }
+
+        public override string ToString()
+        {
+            return Instruction;
+        }
     }
 
     public enum JumpDirection

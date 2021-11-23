@@ -118,12 +118,14 @@ namespace PowerUp.Core.Compilation
                     [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
                     sealed class BenchAttribute : Attribute
                     {{
-                        public BenchAttribute()
+                        public BenchAttribute(params object[] arguments)
                         {{
+                            Arguments = arguments;
                         }}
 
                         public int WarmUpCount {{ get; set; }} = 1000;
                         public int RunCount {{ get; set; }} = 1000;
+                        public object[] Arguments {{get; set;}} 
 
                     }}
 

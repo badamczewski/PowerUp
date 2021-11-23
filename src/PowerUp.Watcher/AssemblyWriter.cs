@@ -119,7 +119,7 @@ namespace PowerUp.Watcher
             //
             // Print messages.
             //
-            if (method.Messages != null && method.Messages.Length > 0)
+            if (method.Messages != null && method.Messages.Count > 0)
             {
                 methodBuilder.AppendLine(
                     Environment.NewLine +

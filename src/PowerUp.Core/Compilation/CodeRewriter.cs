@@ -63,6 +63,8 @@ namespace PowerUp.Core.Compilation
 
                         var warmUpCount = TryExtractValueFromAttribute<int>(found, "WarmUpCount");
                         var runCount    = TryExtractValueFromAttribute<int>(found, "RunCount");
+                        var arguments   = TryExtractValueFromAttribute<object[]>(found, "Arguments");
+
 
                         if (warmUpCount == 0) warmUpCount = 1000;
                         if (runCount == 0)    runCount = 1000;
@@ -74,9 +76,9 @@ namespace PowerUp.Core.Compilation
                                     public (long,int,int) Bench_{functionName}() 
                                     {{ 
                                         Stopwatch w = new Stopwatch();
-                                        for(int i = 0; i < {warmUpCount}; i++) {functionName}();
+                                        for(int i = 0; i < {warmUpCount}; i++) {functionName}({arguments[0]});
                                         w.Start();
-                                        for(int i = 0; i < {runCount}; i++) {functionName}();
+                                        for(int i = 0; i < {runCount}; i++) {functionName}({arguments[0]});
                                         w.Stop();
                                         return (w.ElapsedMilliseconds, {warmUpCount}, {runCount});
                                     }}
@@ -101,11 +103,11 @@ namespace PowerUp.Core.Compilation
                     // Convert single arg print to multi arg print.
                     //
                     var nameOfParam = SyntaxFactory.IdentifierName(arg);
-                    var nameofName = SyntaxFactory.IdentifierName("nameof");
-                    var nameofArgs = SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] { SyntaxFactory.Argument(nameOfParam) }));
-                    var nameofCall = SyntaxFactory.InvocationExpression(nameofName, nameofArgs);
+                    var nameofName  = SyntaxFactory.IdentifierName("nameof");
+                    var nameofArgs  = SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] { SyntaxFactory.Argument(nameOfParam) }));
+                    var nameofCall  = SyntaxFactory.InvocationExpression(nameofName, nameofArgs);
                     var nameOfPrint = SyntaxFactory.IdentifierName("Print");
-                    var printArgs = SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] { SyntaxFactory.Argument(nameOfParam), SyntaxFactory.Argument(nameofCall) }));
+                    var printArgs   = SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList<ArgumentSyntax>(new[] { SyntaxFactory.Argument(nameOfParam), SyntaxFactory.Argument(nameofCall) }));
 
                     var rewritenPrintCall = SyntaxFactory.InvocationExpression(nameOfPrint, printArgs);
 
@@ -147,6 +149,22 @@ namespace PowerUp.Core.Compilation
                         return CreateAttribute("MethodImpl", "MethodImplOptions", "AggressiveInlining");
                     case "NoInline":
                         return CreateAttribute("MethodImpl", "MethodImplOptions", "NoInlining");
+                    case "QuickJIT":
+                        {
+                            var local = (LocalFunctionStatementSyntax)node.Parent;
+                            var functionName = local.Identifier.ValueText;
+                            _options.CompilationMap.TryAdd(functionName, "QuickJIT");
+                            remove = true;
+                            break;
+                        }
+                    case "PGO":
+                        {
+                            var local = (LocalFunctionStatementSyntax)node.Parent;
+                            var functionName = local.Identifier.ValueText;
+                            _options.CompilationMap.TryAdd(functionName, "PGO");
+                            remove = true;
+                            break;
+                        }
                 }
             }
             if (remove)
@@ -167,6 +185,14 @@ namespace PowerUp.Core.Compilation
                     {
                         if (argument.NameEquals.Name.ToString() == name)
                         {
+                            if(argument.Expression is ArrayCreationExpressionSyntax array)
+                            {
+                                return (T)ToArray(array);
+                            }
+                            else if (argument.Expression is ImplicitArrayCreationExpressionSyntax implicitArray)
+                            {
+                                return (T)ToArray(implicitArray);
+                            }
                             var literalOffset = (LiteralExpressionSyntax)argument.Expression;
                             var value = (T)literalOffset.Token.Value;
                             return value;
@@ -176,6 +202,36 @@ namespace PowerUp.Core.Compilation
             }
 
             return default(T);
+        }
+
+        private object ToArray(ArrayCreationExpressionSyntax array)
+        {
+            List<object> list = new List<object>();
+            foreach (var exp in array.Initializer.Expressions)
+            {
+                if (exp is LiteralExpressionSyntax arrayLiteral)
+                {
+                    var element = arrayLiteral.Token.Value;
+                    list.Add(element);
+                }
+            }
+            object obj = list.ToArray();
+            return obj;
+        }
+
+        private object ToArray(ImplicitArrayCreationExpressionSyntax array)
+        {
+            List<object> list = new List<object>();
+            foreach (var exp in array.Initializer.Expressions)
+            {
+                if (exp is LiteralExpressionSyntax arrayLiteral)
+                {
+                    var element = arrayLiteral.Token.Value;
+                    list.Add(element);
+                }
+            }
+            object obj = list.ToArray();
+            return obj;
         }
 
         private CSharpSyntaxNode CreateAttribute(string name, string property, string value)
