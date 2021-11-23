@@ -14,14 +14,14 @@ namespace PowerUp.Watcher
         {
             public string Name { get; set; }
             public string Description { get; set; }
-            public string[] Args { get; set; } = Array.Empty<string>();
+            public string[] Args { get; set; }
             public static UpCommand Create(string name, string description = null)
             {
-                return new UpCommand() { Name = name, Description = description };
+                return new UpCommand() { Name = name, Description = description, Args = Array.Empty<string>() };
             }
             public static UpCommand Create(string name, string description, params string[] args)
             {
-                return new UpCommand() { Name = name, Description = description, Args = args };
+                return new UpCommand() { Name = name, Description = description, Args = args ?? Array.Empty<string>() };
             }
         }
 
@@ -73,7 +73,9 @@ namespace PowerUp.Watcher
             {
                 var token = tokens[i];
                 var value = token.GetValue();
-
+                //
+                // Generic Options that are fit for all compilers.
+                //
                 if(value == "up:showHelp")
                 {
                     optionsToSet.ShowHelp = true;
