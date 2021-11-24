@@ -1,9 +1,7 @@
-# PowerUp
-
 
 ![powerup22](https://user-images.githubusercontent.com/752380/142743460-5827b232-f0ec-4240-9eaa-0947fcc3a87c.png)
 
-### **PowerUp** is a collection or productivity utilities, dissasembly and decompilation tools for multiple languages and platforms:
+### **PowerUp** is a collection or productivity utilities, disassembly and decompilation tools for multiple languages and platforms:
 
 * Live IDE Watcher (For C#, GO and Rust).
 * .NET JIT Dissasembler.
