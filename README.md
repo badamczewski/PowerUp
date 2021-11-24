@@ -1,6 +1,8 @@
 
 ![powerup22](https://user-images.githubusercontent.com/752380/142743460-5827b232-f0ec-4240-9eaa-0947fcc3a87c.png)
 
+[![.NET](https://github.com/badamczewski/PowerUp/actions/workflows/dotnet.yml/badge.svg)](https://github.com/badamczewski/PowerUp/actions/workflows/dotnet.yml)
+
 ### **PowerUp** is a collection or productivity utilities, disassembly and decompilation tools for multiple languages and platforms:
 
 * Live IDE Watcher (For C#, GO and Rust).
