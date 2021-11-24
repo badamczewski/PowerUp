@@ -72,13 +72,14 @@ namespace PowerUp.Core.Compilation
                         //
                         // Add Bench Code
                         //
+                        string argString = arguments != null ? string.Join(",", arguments) : "";
                         _benchCodeBuilder.Append($@"
                                     public (long,int,int) Bench_{functionName}() 
                                     {{ 
                                         Stopwatch w = new Stopwatch();
-                                        for(int i = 0; i < {warmUpCount}; i++) {functionName}({arguments[0]});
+                                        for(int i = 0; i < {warmUpCount}; i++) {functionName}({argString});
                                         w.Start();
-                                        for(int i = 0; i < {runCount}; i++) {functionName}({arguments[0]});
+                                        for(int i = 0; i < {runCount}; i++) {functionName}({argString});
                                         w.Stop();
                                         return (w.ElapsedMilliseconds, {warmUpCount}, {runCount});
                                     }}
