@@ -3,7 +3,9 @@
 
 [![.NET](https://github.com/badamczewski/PowerUp/actions/workflows/dotnet.yml/badge.svg)](https://github.com/badamczewski/PowerUp/actions/workflows/dotnet.yml)
 
-### **PowerUp** is a collection or productivity utilities, disassembly and decompilation tools for multiple languages and platforms:
+### **PowerUp** is a collection or productivity utilities, disassembly and decompilation tools for multiple languages and platforms.
+
+The project features the following utilities and tools:
 
 * Live IDE Watcher (For C#, GO and Rust).
 * .NET JIT Dissasembler.
@@ -39,7 +41,7 @@ C# is the only language that supports (at the moment) running code, interactive 
 
 ![power_up_cs_1](https://user-images.githubusercontent.com/752380/142741796-883cc8ac-259e-4e7b-9c76-624b8e3b7370.gif)
 
-This demo shows layouts feature:
+This demo shows the layouts feature:
 
 ![power_up_cs_2](https://user-images.githubusercontent.com/752380/142742770-ee02faca-f1f9-448c-9e70-f635a147f671.gif)
 
