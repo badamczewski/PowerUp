@@ -78,21 +78,33 @@ namespace PowerUp.Watcher
                                     commandToCall += $" -C opt-level={options.OptimizationLevel}";
 
                                 XConsole.WriteLine($"Calling: {commandToCall}");
-                                WatcherUtils.StartCompilerProcess(commandToCall);
-                                var methods = ParseASM(
-                                    Path.GetFileNameWithoutExtension(inputFile), 
-                                    File.ReadAllText(tmpAsmFile),
-                                    code);
+                                var info = WatcherUtils.StartCompilerProcess(commandToCall, errorPattern: "error");
 
-                                var unit = new DecompilationUnit()
+
+                                if (info.errors.Any() == true)
                                 {
-                                    DecompiledMethods = methods,
-                                    Options = options
-                                };
+                                    StringBuilder errorBuilder = new StringBuilder();
+                                    errorBuilder.AppendLine(String.Join(Environment.NewLine, info.errors));
+                                    errorBuilder.AppendLine(String.Join(Environment.NewLine, info.messages));
+                                    File.WriteAllText(outAsmFile, errorBuilder.ToString());
+                                }
+                                else
+                                {
+                                    var methods = ParseASM(
+                                        Path.GetFileNameWithoutExtension(inputFile),
+                                        File.ReadAllText(tmpAsmFile),
+                                        code);
 
-                                var asmCode = ToAsmString(unit);
-                                File.WriteAllText(outAsmFile, asmCode);
+                                    var unit = new DecompilationUnit()
+                                    {
+                                        Messages = info.messages,
+                                        DecompiledMethods = methods,
+                                        Options = options
+                                    };
 
+                                    var asmCode = ToAsmString(unit);
+                                    File.WriteAllText(outAsmFile, asmCode);
+                                }
                             }
                         }
                     }

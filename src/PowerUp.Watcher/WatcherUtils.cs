@@ -2,6 +2,7 @@
 using PowerUp.Core.Console;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -25,17 +26,67 @@ namespace PowerUp.Watcher
             }
         }
 
-        public static void StartCompilerProcess(string command)
+        public static (string[] messages, string[] errors) StartCompilerProcess(string command, string errorPattern = null)
         {
+            List<string> msg = new List<string>();
+            List<string> err = new List<string>();
+
+            void Process_OutputDataReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
+            {
+                if (e.Data != null)
+                    msg.Add(e.Data);
+            }
+
+            void Process_ErrorDataReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
+            {
+                if (e.Data != null)
+                {
+                    //
+                    // For some of the compilers we need to look for an error message
+                    // (I'm looking at you Rust) to be able to tell if the compilation even
+                    // happened, so we detect these simple patterns and set the compilation error
+                    // flag and return that as an error stream.
+                    //
+                    // Warnings and even normal messages will sometimes be pushed using the error stream
+                    // but most of the time we are interested in handling them differently.
+                    //
+                    if(errorPattern != null && e.Data.StartsWith(errorPattern))
+                    {
+                        err.Add(e.Data);
+                    }
+                    else
+                    {
+                        msg.Add(e.Data);
+                    }
+                }
+            }
+
             System.Diagnostics.Process process = new System.Diagnostics.Process();
             System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
             startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
             startInfo.FileName = "cmd.exe";
             startInfo.Arguments = $"/C {command}";
+            startInfo.RedirectStandardOutput = true;
+            startInfo.RedirectStandardError = true;
+
             process.StartInfo = startInfo;
+
+            process.OutputDataReceived += Process_OutputDataReceived;
+            process.ErrorDataReceived  += Process_ErrorDataReceived;
+
             process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
             process.WaitForExit();
+
+            process.OutputDataReceived -= Process_OutputDataReceived;
+            process.ErrorDataReceived  -= Process_ErrorDataReceived;
+
+            return (msg.ToArray(), err.ToArray());
         }
+
+
 
         //
         // This array contains all of the up:commands
