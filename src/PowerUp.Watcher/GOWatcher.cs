@@ -120,7 +120,7 @@ namespace PowerUp.Watcher
 
                                 WatcherUtils.StartCompilerProcess(command);
                                 var options = WatcherUtils.ProcessCommandOptions(code);
-                                var methods = ParseASM(File.ReadAllText(tmpAsmFile));
+                                var methods = ParseASM(File.ReadAllText(tmpAsmFile), code);
 
                                 var unit = new DecompilationUnit() 
                                 { 
@@ -185,6 +185,7 @@ namespace PowerUp.Watcher
                     // method that we should not even parse.
                     //
                     if (inst.Instruction == null) continue;
+                    if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
 
                     lineBuilder.Append("  ");
                     //
@@ -458,7 +459,7 @@ namespace PowerUp.Watcher
             return builder.ToString();
         }
 
-        private DecompiledMethod[] ParseASM(string asm)
+        private DecompiledMethod[] ParseASM(string asm, string sourceCode)
         {
             //
             // GO ASM Format can be expressed by a state machine going line by line
@@ -483,9 +484,12 @@ namespace PowerUp.Watcher
                 .Trim()
                 .Split("\n");
 
+            var sourceCodeLines = sourceCode.Split("\n");
+
             List<DecompiledMethod> methods = new List<DecompiledMethod>();
             DecompiledMethod decompiledMethod = null;
             int index = 0;
+            int lastSourceLine = -1;
 
             for (int i = 0; i < lines.Length; i++)
             { 
@@ -496,7 +500,7 @@ namespace PowerUp.Watcher
                 {
                     if (line.Contains("TEXT"))
                     {
-                        var nameInst = ParseInstruction(line);
+                        var nameInst = ParseInstruction(line, out var sourceCodeLine);
 
                         index = 0;
                         decompiledMethod = new DecompiledMethod();
@@ -506,7 +510,34 @@ namespace PowerUp.Watcher
                     }
                     else
                     {
-                        var inst = ParseInstruction(line);
+                        var inst = ParseInstruction(line, out var sourceCodeLine);
+                        //
+                        // Check if the instruction has an source code line map.
+                        // If it has then create a source map intruction with the
+                        // instrution value pointing back to source code.
+                        //
+                        // Multiple instructions can map to the same code line
+                        // like for example this if statement:
+                        //     0000: CMPQ   AX, $1        
+                        //     0004: JNE C ⇣    
+                        //
+                        // We only want to display a single source line, so we shall keep
+                        // the lastSourceLineNumber and only emit the source code instruction
+                        // if we haven't already emited it.
+                        //
+                        if (sourceCodeLine != -1 && lastSourceLine != sourceCodeLine)
+                        {
+                            AssemblyInstruction sourceCodeInst = new AssemblyInstruction();
+                            sourceCodeInst.IsCode = true;
+                            sourceCodeInst.Instruction = $"{sourceCodeLines[sourceCodeLine - 1].Trim()}";
+                            sourceCodeInst.OrdinalIndex = index;
+                            sourceCodeInst.Arguments = new InstructionArg[0];
+                            decompiledMethod.Instructions.Add(sourceCodeInst);
+                            index++;
+
+                            lastSourceLine = sourceCodeLine;
+                        }
+
                         inst.OrdinalIndex = index;
                         index++;
                         decompiledMethod.Instructions.Add(inst);
@@ -528,8 +559,9 @@ namespace PowerUp.Watcher
         }
 
 
-        private AssemblyInstruction ParseInstruction(string line)
+        private AssemblyInstruction ParseInstruction(string line, out int sourceCodeLine)
         {
+            sourceCodeLine = -1;
             XConsoleTokenizer tokenizer = new XConsoleTokenizer();
             var tokens = tokenizer.Tokenize(line);
             //
@@ -558,6 +590,10 @@ namespace PowerUp.Watcher
             int argsIndex = -1;
             for(int i = 3; i < tokens.Count; i++)
             {
+                //
+                // Look for bracket close [6], the instruction and it's arguments fall 
+                // right after this token.
+                //
                 if(tokens[i] is BracketCloseToken && i + 1 < tokens.Count)
                 {
                     while(PeekNext(tokens, i, out var next))
@@ -575,6 +611,29 @@ namespace PowerUp.Watcher
                     }
                     break;
                 }
+                else if(tokens[i] is BracketOpenToken && i + 1 < tokens.Count)
+                {
+                    //
+                    // Should be a Source Code Map:
+                    //
+                    // The next token should contain a source map.
+                    // Since not all lines contain such a map and some do contain it but it's
+                    // not something that we can use ((<autogenerated>:1), we have to take 
+                    // extra care when parsing this next token.
+                    //
+                    if (PeekNext(tokens, i, out var next))
+                    {
+                        var value = next.GetValue();
+                        var last  = value.Split(":")[^1];
+                        //
+                        // Take the last element and this will be our source line number.
+                        //
+                        if(int.TryParse(last, out var lineNumber))
+                        {
+                            sourceCodeLine = lineNumber;
+                        }
+                    }
+                }    
             }
 
             List<InstructionArg> instructionArgs = new List<InstructionArg>();
