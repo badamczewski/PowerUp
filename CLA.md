@@ -8,6 +8,6 @@ You represent that the Contributions are Your original works of authorship, and 
 
 Bartosz Adamczewski acknowledges that, except as explicitly described in this Agreement, any Contribution which you provide is on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF TITLE, NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 
-All contributors that made changes to PowerUp before the "Contributor License Agreement" was created shall provide evidence that they acknowledge this license agreement:
+All contributors that made changes to PowerUp before the "Contributor License Agreement" was created shall provide evidence that they acknowledge this license agreement, by signing under (leaving their first and last name):
 
-Bartosz Adamczewski
+1. Bartosz Adamczewski
