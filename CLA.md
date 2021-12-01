@@ -11,3 +11,4 @@ Bartosz Adamczewski acknowledges that, except as explicitly described in this Ag
 All contributors that made changes to PowerUp before the "Contributor License Agreement" was created shall provide evidence that they acknowledge this license agreement, by signing under (leaving their first and last name):
 
 1. Bartosz Adamczewski
+2. Yoh Deadfall
