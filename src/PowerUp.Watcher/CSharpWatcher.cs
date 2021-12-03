@@ -421,6 +421,18 @@ namespace PowerUp.Watcher
 
                     index++;
                 }
+
+                //
+                // If we have only the header then we need to put the closing 
+                // table border.
+                //
+                if (isHeaderEnd == false)
+                {
+                    isHeaderEnd = true;
+                    layoutBuilder.Append(displayPadding);
+                    layoutBuilder.AppendLine(ConsoleBorderStyle.BottomLeft + headerTopBottom + ConsoleBorderStyle.BottomRight);
+                }
+
                 layoutBuilder.AppendLine($"    Size:    {typeLayout.Size} {(typeLayout.IsBoxed ? "# Estimated" : "")}");
                 layoutBuilder.AppendLine($"    Padding: {typeLayout.PaddingSize} {(typeLayout.IsBoxed ? "# Estimated" : "")}");
 
