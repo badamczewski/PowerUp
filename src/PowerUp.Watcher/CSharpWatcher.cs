@@ -755,7 +755,7 @@ namespace PowerUp.Watcher
                                     // Now we should have the optimal version of the code.
                                     // Add it to the list.
                                     // 
-                                    // @TODO @NOTE: For some unknown reason the PGO version is always slower then the Optimized
+                                    // @TODO @NOTE: For some unknown reason the PGO version is always slower than the Optimized
                                     // version of the code, even when having a much better codegen.
                                     // I don't know why this happend but we need to investigate this.
                                     //
