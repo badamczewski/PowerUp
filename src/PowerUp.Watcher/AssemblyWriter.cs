@@ -100,7 +100,7 @@ namespace PowerUp.Watcher
         public void AppendMethodSignature(StringBuilder methodBuilder, DecompiledMethod method)
         {
             methodBuilder.AppendLine($"# Instruction Count: {method.Instructions.Count}; Code Size: {method.CodeSize}");
-            methodBuilder.Append($"{method.Return} {method.Name}(");
+            methodBuilder.Append($"{(method.TypeName == null ? "" : method.TypeName + "+")}{method.Return} {method.Name}(");
 
             for (int i = 0; i < method.Arguments.Length; i++)
             {

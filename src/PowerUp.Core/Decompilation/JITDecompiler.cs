@@ -220,8 +220,10 @@ namespace PowerUp.Core.Decompilation
                     topLevelDelegateAddress.codeSize, functionCallName);
 
                 var @params = method.GetParameters();
+                
                 decompiledMethod.Name = method.Name;
-                decompiledMethod.Return = method.ReturnType.Name;
+                decompiledMethod.TypeName  = method.DeclaringType.Name;
+                decompiledMethod.Return    = method.ReturnType.Name;
                 decompiledMethod.Arguments = new string[@params.Length];
 
                 int idx = 0;

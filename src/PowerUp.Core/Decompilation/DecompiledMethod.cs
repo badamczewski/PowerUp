@@ -45,6 +45,7 @@ namespace PowerUp.Core.Decompilation
 
     public class DecompiledMethod
     {
+        public string TypeName { get; set; }
         public string Name { get; set; }
         public string Return { get; set; }
         public string[] Arguments { get; set; }

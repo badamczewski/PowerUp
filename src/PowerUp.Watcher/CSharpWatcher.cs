@@ -483,7 +483,6 @@ namespace PowerUp.Watcher
                 {
                     lineBuilder.Clear();
 
-
                     lineBuilder.Append("  ");
                     //
                     // Append Jump Guides if needed.
@@ -655,10 +654,22 @@ namespace PowerUp.Watcher
                 {
                     assemblyStream.Position = 0;
                     var loaded = ctx.LoadFromStream(assemblyStream);
+                    List<DecompiledMethod> methods = new List<DecompiledMethod>();
 
                     var compiledType = loaded.GetType("CompilerGen");
+                    
                     var decompiledMethods  = compiledType.ToAsm(@private: true);
                     var typesMemoryLayouts = compiledType.ToLayout(@private: true);
+
+                    //
+                    // Get all nested types and decompile them as well.
+                    //
+                    var types = compiledType.GetNestedTypes();
+                    foreach (var type in types)
+                    {
+                        var innerMethods = type.ToAsm(@private: true);
+                        AddMethods(innerMethods, methods);
+                    }
                     //
                     // Run operations such as Benchmarking, Running and Interactive printing.
                     // Since we don't want these operations and generated methods to be ouptuted
@@ -666,9 +677,7 @@ namespace PowerUp.Watcher
                     //
                     RunPostCompilationOperations(loaded, compiledType, decompiledMethods);
                     HideInternalDecompiledMethods(decompiledMethods);
-
-                    List<DecompiledMethod> methods = new List<DecompiledMethod>();
-                    methods.AddRange(decompiledMethods);
+                    AddMethods(decompiledMethods, methods);
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
@@ -772,6 +781,19 @@ namespace PowerUp.Watcher
             }
 
             return unit;
+        }
+
+        private void AddMethods(DecompiledMethod[] methods, List<DecompiledMethod> totalMethodsToAdd)
+        {
+            foreach (var method in methods)
+            {
+                if (method == null) continue;
+                //
+                // Don't show the base type method types.
+                //
+                if (method.TypeName == "CompilerGen") method.TypeName = null;
+                totalMethodsToAdd.Add(method);
+            }
         }
 
         private void HideInternalDecompiledMethods(DecompiledMethod[] methods)
