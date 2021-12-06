@@ -106,9 +106,11 @@ namespace PowerUp.Core.Console
                 //
                 // Get out of the loop and throw.
                 //
-                itterationCount--;
                 if (itterationCount == 0)
                     throw new Exception("Tokenizer is in an infinite loop");
+
+                itterationCount--;
+
             }
 
             return tokens;

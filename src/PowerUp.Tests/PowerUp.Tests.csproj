@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TieredCompilation>false</TieredCompilation>
+    <TieredCompilation>true</TieredCompilation>
   </PropertyGroup>
   
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
