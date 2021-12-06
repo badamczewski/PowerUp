@@ -343,6 +343,7 @@ namespace PowerUp.Watcher
                 layoutBuilder.AppendLine("{");
 
                 bool isHeaderEnd = false;
+                bool hasHeader   = false;
                 int index = 0;
                 foreach (var fieldLayout in typeLayout.Fields)
                 {
@@ -362,6 +363,7 @@ namespace PowerUp.Watcher
                     {
                         if (index == 0 && fieldLayout.IsHeader == true)
                         {
+                            hasHeader = true;
                             layoutBuilder.AppendLine(@"Metadata:");
                             layoutBuilder.Append(displayPadding);
                             layoutBuilder.AppendLine(ConsoleBorderStyle.TopLeft + headerTopBottom + ConsoleBorderStyle.TopRight);
@@ -426,7 +428,7 @@ namespace PowerUp.Watcher
                 // If we have only the header then we need to put the closing 
                 // table border.
                 //
-                if (isHeaderEnd == false)
+                if (hasHeader && isHeaderEnd == false)
                 {
                     isHeaderEnd = true;
                     layoutBuilder.Append(displayPadding);
@@ -654,7 +656,7 @@ namespace PowerUp.Watcher
                 {
                     assemblyStream.Position = 0;
                     var loaded = ctx.LoadFromStream(assemblyStream);
-                    List<DecompiledMethod> methods = new List<DecompiledMethod>();
+                    List<DecompiledMethod> globalMethodList = new List<DecompiledMethod>();
 
                     var compiledType = loaded.GetType("CompilerGen");
                     
@@ -668,7 +670,7 @@ namespace PowerUp.Watcher
                     foreach (var type in types)
                     {
                         var innerMethods = type.ToAsm(@private: true);
-                        AddMethods(innerMethods, methods);
+                        AddMethodsToGlobalList(innerMethods, globalMethodList);
                     }
                     //
                     // Run operations such as Benchmarking, Running and Interactive printing.
@@ -677,7 +679,7 @@ namespace PowerUp.Watcher
                     //
                     RunPostCompilationOperations(loaded, compiledType, decompiledMethods);
                     HideInternalDecompiledMethods(decompiledMethods);
-                    AddMethods(decompiledMethods, methods);
+                    AddMethodsToGlobalList(decompiledMethods, globalMethodList);
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
@@ -738,7 +740,7 @@ namespace PowerUp.Watcher
                                     // saying that it's Jitted.
                                     //
                                     decompiledMethod.Messages.Add("# QuickJIT");
-                                    methods.Add(decompiledMethod);
+                                    globalMethodList.Add(decompiledMethod);
                                 }
                                 else if (attribute == "PGO")
                                 {
@@ -768,14 +770,14 @@ namespace PowerUp.Watcher
                                     // version of the code, even when having a much better codegen.
                                     // I don't know why this happend but we need to investigate this.
                                     //
-                                    methods.Add(afterPGO);
+                                    globalMethodList.Add(afterPGO);
                                 }
                             }
                         }
                     }
                     ILDecompiler iLDecompiler = new ILDecompiler();
                     unit.ILCode = iLDecompiler.ToIL(assemblyStream, pdbStream);
-                    unit.DecompiledMethods = methods.ToArray();
+                    unit.DecompiledMethods = globalMethodList.ToArray();
                     unit.TypeLayouts = typesMemoryLayouts;
                 }
             }
@@ -783,7 +785,7 @@ namespace PowerUp.Watcher
             return unit;
         }
 
-        private void AddMethods(DecompiledMethod[] methods, List<DecompiledMethod> totalMethodsToAdd)
+        private void AddMethodsToGlobalList(DecompiledMethod[] methods, List<DecompiledMethod> totalMethodsToAdd)
         {
             foreach (var method in methods)
             {

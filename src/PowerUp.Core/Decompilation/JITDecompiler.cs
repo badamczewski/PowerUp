@@ -91,21 +91,21 @@ namespace PowerUp.Core.Decompilation
                     // [SyncBlkIndex ... Other][MT][FieldA][FieldB]
                     //
                     var obj = runtime.Heap.GetObject((ulong)(p - 1));
-                    if(obj.Type != null)
+                    if (obj.Type != null)
                     {
                         if (obj.Type != null && obj.Type.Name == type.FullName)
                         {
                             fieldLayouts.Clear();
 
                             decompiledType = new TypeLayout();
-                            decompiledType.Name = obj.Type.Name;
-                            decompiledType.Fields = new FieldLayout[obj.Type.Fields.Count];
+                            decompiledType.Name    = obj.Type.Name;
+                            decompiledType.Fields  = new FieldLayout[obj.Type.Fields.Count];
                             decompiledType.IsBoxed = obj.IsBoxed;
-                            decompiledType.Size = obj.Size;
+                            decompiledType.Size    = obj.Size;
 
                             var isClass = (type.IsValueType && obj.IsBoxed) == false;
-                            int fieldIndex  = 0;
-                            int baseOffset  = 0;
+                            int fieldIndex = 0;
+                            int baseOffset = 0;
                             //
                             // Add Class Header Metadata
                             //
@@ -131,15 +131,15 @@ namespace PowerUp.Core.Decompilation
                                 fieldLayouts.Add(header);
                                 fieldLayouts.Add(mt);
 
-                                baseOffset  += mt.Offset + mt.Size;
+                                baseOffset += mt.Offset + mt.Size;
                             }
 
                             foreach (var field in obj.Type.Fields)
                             {
                                 var size = field.Size;
-                                if(field.ElementType == ClrElementType.Struct)
+                                if (field.ElementType == ClrElementType.Struct)
                                     size = sizeof(IntPtr);
-                                
+
                                 fieldLayouts.Add(new FieldLayout()
                                 {
                                     Name = field.Name,
@@ -155,7 +155,7 @@ namespace PowerUp.Core.Decompilation
                                     // We have found a gap.
                                     // Create a new field that will represent the gap.
                                     //
-                                    var fieldEndOffset  = baseOffset + field.Offset + size;
+                                    var fieldEndOffset = baseOffset + field.Offset + size;
                                     if (fieldEndOffset != baseOffset + next.Offset)
                                     {
                                         var padding = new FieldLayout()
@@ -174,25 +174,61 @@ namespace PowerUp.Core.Decompilation
                                 fieldIndex++;
                             }
 
+                            AddTailingPadding(type, decompiledType, obj, fieldLayouts);
                             decompiledType.Fields = fieldLayouts.ToArray();
-                            //
-                            // @SIZE_OF_STRUCTS:
-                            //
-                            if (type.IsValueType && obj.IsBoxed)
-                            {
-                                if (obj.Type.Fields.Any() == false)
-                                    decompiledType.Size = 1;
-                                else
-                                {
-                                    var last = decompiledType.Fields.Last();
-                                    decompiledType.Size = (ulong)(baseOffset + last.Offset + last.Size);
-                                }
-                            }
                         }
-
                     }
 
                     return decompiledType;
+                }
+            }
+        }
+
+        private unsafe void AddTailingPadding(Type type, TypeLayout decompiledType, ClrObject obj, List<FieldLayout> fieldLayouts)
+        {
+            var last = fieldLayouts.Last();
+            var nextOffset = last.Offset + last.Size;
+
+            if (type.IsValueType && obj.IsBoxed)
+            {
+                if (obj.Type.Fields.Any() == false)
+                    decompiledType.Size = 1;
+                else
+                {
+                    var tailPadding = obj.Size - (ulong)nextOffset - (ulong)(2 * sizeof(IntPtr));
+                    decompiledType.Size = (ulong)nextOffset;
+
+                    if (tailPadding > 0)
+                    {
+                        decompiledType.Size += tailPadding;
+                        var padding = new FieldLayout()
+                        {
+                            Name = null,
+                            Offset = last.Offset + 1,
+                            Type = $"Padding",
+                            Size = (int)tailPadding
+                        };
+
+                        fieldLayouts.Add(padding);
+                        decompiledType.PaddingSize += (ulong)padding.Size;
+                    }
+                }
+            }
+            else
+            {
+                var tailPadding = obj.Size - (ulong)nextOffset;
+                if (tailPadding > 0)
+                {
+                    var padding = new FieldLayout()
+                    {
+                        Name = null,
+                        Offset = nextOffset,
+                        Type = $"Padding",
+                        Size = (int)tailPadding
+                    };
+
+                    fieldLayouts.Add(padding);
+                    decompiledType.PaddingSize += (ulong)padding.Size;
                 }
             }
         }
