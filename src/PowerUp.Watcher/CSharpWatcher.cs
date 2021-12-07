@@ -658,7 +658,7 @@ namespace PowerUp.Watcher
                     var loaded = ctx.LoadFromStream(assemblyStream);
                     List<DecompiledMethod> globalMethodList = new List<DecompiledMethod>();
 
-                    var compiledType = loaded.GetType("CompilerGen");
+                    var compiledType = loaded.GetType(CodeCompiler.BaseClassName);
                     
                     var decompiledMethods  = compiledType.ToAsm(@private: true);
                     var typesMemoryLayouts = compiledType.ToLayout(@private: true);
@@ -677,7 +677,7 @@ namespace PowerUp.Watcher
                     // Since we don't want these operations and generated methods to be ouptuted
                     // to the IL and ASM outputs we need to hide them.
                     //
-                    RunPostCompilationOperations(loaded, compiledType, decompiledMethods);
+                    RunPostCompilationOperations(loaded, compiledType, decompiledMethods, typesMemoryLayouts);
                     HideInternalDecompiledMethods(decompiledMethods);
                     AddMethodsToGlobalList(decompiledMethods, globalMethodList);
 
@@ -705,7 +705,7 @@ namespace PowerUp.Watcher
                         //
                         // For PGO it will also inject the histogram table counter.
                         //
-                        compiledType      = loaded.GetType("CompilerGen");
+                        compiledType      = loaded.GetType(CodeCompiler.BaseClassName);
                         decompiledMethods = compiledType.ToAsm(@private: true);
                         //
                         // @NOTE: This is not optimial at all but for now let's go with this version since it's
@@ -750,7 +750,7 @@ namespace PowerUp.Watcher
                                     //
                                     if (_isPGO)
                                     {
-                                        RunPostCompilationOperations(loaded, compiledType, new[] { decompiledMethod });
+                                        RunPostCompilationOperations(loaded, compiledType, new[] { decompiledMethod }, null);
                                     }
                                     else
                                     {
@@ -793,7 +793,7 @@ namespace PowerUp.Watcher
                 //
                 // Don't show the base type method types.
                 //
-                if (method.TypeName == "CompilerGen") method.TypeName = null;
+                if (method.TypeName == CodeCompiler.BaseClassName) method.TypeName = null;
                 totalMethodsToAdd.Add(method);
             }
         }
@@ -805,23 +805,24 @@ namespace PowerUp.Watcher
             //
             for (int i = 0; i < methods.Length; i++)
             {
-                if (methods[i].Name.StartsWith("Bench_")) methods[i] = null;
-                else if (methods[i].Name == "Print")      methods[i] = null;
+                if (methods[i].Name.StartsWith("Bench_"))       methods[i] = null;
+                else if (methods[i].Name == "Print")            methods[i] = null;
+                else if (methods[i].Name.StartsWith("SizeOf_")) methods[i] = null;
             }
         }
 
-        private void RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType, DecompiledMethod[] decompiledMethods)
+        private void RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType, DecompiledMethod[] decompiledMethods, TypeLayout[] typeLayouts)
         {
             var methods = compiledType.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
-            RunPostCompilationOperations(loadedAssembly, decompiledMethods, methods);
+            RunPostCompilationOperations(loadedAssembly, decompiledMethods, methods, typeLayouts);
         }
-        private void RunPostCompilationOperations(Assembly loadedAssembly, DecompiledMethod[] decompiledMethods, MethodInfo[] methodInfos)
+        private void RunPostCompilationOperations(Assembly loadedAssembly, DecompiledMethod[] decompiledMethods, MethodInfo[] methodInfos, TypeLayout[] typeLayouts)
         {
             List<string> messages = new List<string>();
             int order = 1;
 
             var compiledLog = loadedAssembly.GetType("_Log");
-            var instance    = loadedAssembly.CreateInstance("CompilerGen");
+            var instance    = loadedAssembly.CreateInstance(CodeCompiler.BaseClassName);
             foreach (var method in methodInfos)
             {
                 if (method.Name.StartsWith("Bench_"))
@@ -847,6 +848,29 @@ namespace PowerUp.Watcher
                         order++;
 
                         messages.Clear();
+                    }
+                }
+                else if(method.Name.StartsWith("SizeOf_"))
+                {
+                    if (typeLayouts != null)
+                    {
+                        var methodUnderSizeName = method.Name.Split("_")[1];
+                        methodUnderSizeName = $"{CodeCompiler.BaseClassName}+" + methodUnderSizeName;
+                        var size = (int)method.Invoke(instance, null);
+
+                        var layout = typeLayouts.FirstOrDefault(x => x.Name == methodUnderSizeName);
+                        if (layout != null)
+                        {
+                            var diff = Math.Abs((int)(layout.Size - (ulong)size));
+                            layout.Size = (ulong)size;
+                            layout.PaddingSize -= (ulong)diff;
+
+                            var padding = layout.Fields.Last();
+                            if(padding.Type == "Padding")
+                            {
+                                padding.Size -= diff; 
+                            }
+                        }
                     }
                 }
                 else

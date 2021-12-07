@@ -13,7 +13,9 @@ namespace PowerUp.Core.Compilation
     {
         private readonly CompilationOptions _options;
         private readonly StringBuilder _benchCodeBuilder = new();
-        private readonly StringBuilder _usingBuilder     = new();  
+        private readonly StringBuilder _usingBuilder     = new();
+        private readonly StringBuilder _structSizeOfbuilder = new();
+
         public CodeRewriter(CompilationOptions options)
         {
             _options = options;
@@ -22,6 +24,11 @@ namespace PowerUp.Core.Compilation
         public string GetBenchCodeOrEmpty()
         {
             return _benchCodeBuilder.ToString();
+        }
+
+        public string GetStructSizeOrEmpty()
+        {
+            return _structSizeOfbuilder.ToString();
         }
 
         public string GetUsingsOrEmpty()
@@ -117,6 +124,14 @@ namespace PowerUp.Core.Compilation
             }
 
             return base.VisitInvocationExpression(node);
+        }
+
+        public override SyntaxNode VisitStructDeclaration(StructDeclarationSyntax node)
+        {
+            _structSizeOfbuilder.AppendLine($@"
+                public static int SizeOf_{node.Identifier.Text}() => Unsafe.SizeOf<{node.Identifier.Text}>();");
+
+            return base.VisitStructDeclaration(node);
         }
 
         public override SyntaxNode VisitAttributeList(AttributeListSyntax node)

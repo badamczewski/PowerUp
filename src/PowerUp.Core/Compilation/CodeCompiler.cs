@@ -19,6 +19,9 @@ namespace PowerUp.Core.Compilation
 {
     public class CodeCompiler
     {
+
+        public const string BaseClassName = "CompilerGen";
+
         public string DotNetCoreDirPath { get; private set; }
         public LanguageVersion LanguageVersion { get; private set; }
 
@@ -81,10 +84,11 @@ namespace PowerUp.Core.Compilation
             var root = ast.GetRoot();
 
             CodeRewriter rewriter = new CodeRewriter(options);
-            root          = rewriter.Visit(root);
-            code          = root.ToFullString();
-            var benchCode = rewriter.GetBenchCodeOrEmpty();
-            var usingCode = rewriter.GetUsingsOrEmpty();
+            root           = rewriter.Visit(root);
+            code           = root.ToFullString();
+            var benchCode  = rewriter.GetBenchCodeOrEmpty();
+            var usingCode  = rewriter.GetUsingsOrEmpty();
+            var sizeOfCode = rewriter.GetStructSizeOrEmpty();
 
             var sourceCode = $@"
                     using System.Linq;
@@ -150,10 +154,11 @@ namespace PowerUp.Core.Compilation
                         public static List<string> print = new();
                     }}
 
-                    public class CompilerGen
+                    public class {BaseClassName}
                     {{
                         {code}
                         {benchCode}
+                        {sizeOfCode}
 
                         static void Print(object o, string name = ""<expr>"") 
                         {{

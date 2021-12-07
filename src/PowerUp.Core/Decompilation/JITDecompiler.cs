@@ -158,16 +158,24 @@ namespace PowerUp.Core.Decompilation
                                     var fieldEndOffset = baseOffset + field.Offset + size;
                                     if (fieldEndOffset != baseOffset + next.Offset)
                                     {
-                                        var padding = new FieldLayout()
+                                        var paddingSize = next.Offset - (field.Offset + size);
+                                        //
+                                        // Negative gaps might happen when we mess arround with field offsets
+                                        // so in such a case they arent gaps but "overlaps"
+                                        //
+                                        if (paddingSize > 0)
                                         {
-                                            Name = null,
-                                            Offset = fieldEndOffset,
-                                            Type = $"Padding",
-                                            Size = next.Offset - (field.Offset + size)
-                                        };
+                                            var padding = new FieldLayout()
+                                            {
+                                                Name = null,
+                                                Offset = fieldEndOffset,
+                                                Type = $"Padding",
+                                                Size = paddingSize
+                                            };
 
-                                        fieldLayouts.Add(padding);
-                                        decompiledType.PaddingSize += (ulong)padding.Size;
+                                            fieldLayouts.Add(padding);
+                                            decompiledType.PaddingSize += (ulong)padding.Size;
+                                        }
                                     }
                                 }
 
