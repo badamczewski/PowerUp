@@ -336,7 +336,16 @@ namespace PowerUp.Watcher
             StringBuilder layoutBuilder = new StringBuilder();
             foreach (var typeLayout in typeLayouts)
             {
+                if(typeLayout.IsValid == false)
+                {
+                    layoutBuilder.AppendLine($"# [WARN] {typeLayout.Name} {typeLayout.Message}");
+                    continue;
+                }
+
                 displayPadding = new string(' ', 4);
+
+                if(typeLayout.Message != null)
+                    layoutBuilder.AppendLine($"# {typeLayout.Message}");
 
                 layoutBuilder.AppendLine($"# {typeLayout.Name} Memory Layout. {(typeLayout.IsBoxed ? "\r\n# (struct sizes might be wrong since they are boxed to extract layouts)" : "")} ");
                 layoutBuilder.AppendLine($"{(typeLayout.IsBoxed ? "struct" : "class")} {typeLayout.Name}");

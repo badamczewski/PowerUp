@@ -25,15 +25,42 @@ namespace PowerUp.Core.Decompilation
             foreach(var type in typeInfo.GetNestedTypes(flags))
             {
                 //
-                // Now Get the layout.
+                // Get the layout:
+                // To be able to create the object we need to call it's constructor.
+                // @TODO: For now we shall only support a default contructor, but later
+                // we should add a feature where the constructor can be picked and filled using
+                // correct parameters.
                 //
-                var obj = type.Assembly.CreateInstance(type.FullName);
-                var typeMemLayout = decompiler.GetTypeLayoutFromHeap(type, obj);
-                if (typeMemLayout != null)
-                    types.Add(typeMemLayout);
+                if (HasDefaultConstructor(type))
+                {
+                    var obj = type.Assembly.CreateInstance(type.FullName);
+                    var typeMemLayout = decompiler.GetTypeLayoutFromHeap(type, obj);
+                    if (typeMemLayout != null)
+                        types.Add(typeMemLayout);
+                }
+                else
+                {
+                    types.Add(new TypeLayout() 
+                    { 
+                        Name = type.Name, 
+                        IsValid = false, 
+                        Message = @"Type Layout requires a default constructor" 
+                    });
+                }
             }
 
             return types.ToArray(); 
+        }
+
+        private static bool HasDefaultConstructor(Type type)
+        {
+            var constructors = type.GetConstructors();
+            foreach (var c in constructors)
+            {
+                if (c.GetParameters().Length == 0)
+                    return true;
+            }
+            return false;
         }
 
         public static DecompiledMethod[] ToAsm(this Type typeInfo, bool @private = false)
