@@ -23,7 +23,12 @@ namespace PowerUp.Core.Console
             int line = 1;
             int offset = 0;
             int i = 0;
-            int itterationCount = input.Length;
+            //
+            // Itteration count = len * 2 since there are (rare) cases when processing
+            // the entire input will trigger the infinite loop exception, this is esp true
+            // with some hidden unicore characters.
+            //
+            int itterationCount = input.Length * 2;
 
             while (i < input.Length)
             {
