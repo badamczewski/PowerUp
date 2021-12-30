@@ -31,7 +31,7 @@ namespace PowerUp.Core.Decompilation
                 // we should add a feature where the constructor can be picked and filled using
                 // correct parameters.
                 //
-                if (HasDefaultConstructor(type))
+                if (HasDefaultConstructorOrIsEnum(type))
                 {
                     var obj = type.Assembly.CreateInstance(type.FullName);
                     var typeMemLayout = decompiler.GetTypeLayoutFromHeap(type, obj);
@@ -52,8 +52,16 @@ namespace PowerUp.Core.Decompilation
             return types.ToArray(); 
         }
 
-        private static bool HasDefaultConstructor(Type type)
+
+        private static bool HasDefaultConstructorOrIsEnum(Type type)
         {
+            //
+            // Enums are somewhat interesting since they don't
+            // have any default constructors in the metadata but
+            // they can still be instantiated using one.
+            //
+            if (type.IsEnum) return true;
+
             var constructors = type.GetConstructors();
             foreach (var c in constructors)
             {
@@ -65,6 +73,9 @@ namespace PowerUp.Core.Decompilation
 
         public static DecompiledMethod[] ToAsm(this Type typeInfo, bool @private = false)
         {
+            if (typeInfo.IsEnum)
+                return Array.Empty<DecompiledMethod>();
+
             List<DecompiledMethod> methods = new List<DecompiledMethod>();
 
             foreach (var constructorInfo in typeInfo.GetConstructors())
