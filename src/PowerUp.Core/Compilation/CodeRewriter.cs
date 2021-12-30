@@ -126,6 +126,14 @@ namespace PowerUp.Core.Compilation
             return base.VisitInvocationExpression(node);
         }
 
+        public override SyntaxNode VisitEnumDeclaration(EnumDeclarationSyntax node)
+        {
+            _structSizeOfbuilder.AppendLine($@"
+                public static int SizeOf_{node.Identifier.Text}() => Unsafe.SizeOf<{node.Identifier.Text}>();");
+
+            return base.VisitEnumDeclaration(node);
+        }
+
         public override SyntaxNode VisitStructDeclaration(StructDeclarationSyntax node)
         {
             _structSizeOfbuilder.AppendLine($@"

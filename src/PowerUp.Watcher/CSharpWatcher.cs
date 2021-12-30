@@ -356,6 +356,8 @@ namespace PowerUp.Watcher
                 int index = 0;
                 foreach (var fieldLayout in typeLayout.Fields)
                 {
+                    if (fieldLayout == null) continue;
+
                     layoutBuilder.Append(displayPadding);
                     //
                     // For reference types we need to include the Metadata
@@ -877,7 +879,8 @@ namespace PowerUp.Watcher
                             var padding = layout.Fields.Last();
                             if(padding.Type == "Padding")
                             {
-                                padding.Size -= diff; 
+                                padding.Size -= diff;
+                                if (padding.Size <= 0) layout.Fields[layout.Fields.Length - 1] = null;
                             }
                         }
                     }
