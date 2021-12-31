@@ -182,6 +182,11 @@ namespace PowerUp.Core.Decompilation
                                 fieldIndex++;
                             }
 
+                            //
+                            // Add tailing padding if there is any. We do this in a method because
+                            // the logic is quite complicated and it's not really* possible to add
+                            // the correct tail padding size for all cases.
+                            //
                             AddTailingPadding(type, decompiledType, obj, fieldLayouts);
                             decompiledType.Fields = fieldLayouts.ToArray();
                         }
@@ -203,6 +208,20 @@ namespace PowerUp.Core.Decompilation
                     decompiledType.Size = 1;
                 else
                 {
+                    //
+                    // This calculation is not always correct but for structs we correct it later
+                    // when we emit a sizeOf method after decompilation.
+                    //
+                    // The idea is that if the [obj size] - [last offset + size] - [obj header size]
+                    // is grater then zero then it must mean that there is padding involed, that part is true.
+                    //
+                    // But renember that we are measuring this on the heap, and structs when being on the stack have
+                    // different layouts then on the heap, so this ends up beeing mostly correct.
+                    //
+                    // How do we fix this?
+                    // At the level of the decompiler it's impossible. 
+                    // But we can call Unsafe.SizeOf for concreate structs.
+                    //
                     var tailPadding = obj.Size - (ulong)nextOffset - (ulong)(2 * sizeof(IntPtr));
                     decompiledType.Size = (ulong)nextOffset;
 

@@ -668,11 +668,20 @@ namespace PowerUp.Watcher
                     assemblyStream.Position = 0;
                     var loaded = ctx.LoadFromStream(assemblyStream);
                     List<DecompiledMethod> globalMethodList = new List<DecompiledMethod>();
+                    List<TypeLayout> typesMemoryLayouts     = new List<TypeLayout>();
 
                     var compiledType = loaded.GetType(CodeCompiler.BaseClassName);
-                    
                     var decompiledMethods  = compiledType.ToAsm(@private: true);
-                    var typesMemoryLayouts = compiledType.ToLayout(@private: true);
+
+                    //
+                    // @NOTE: For now we are skipping global type layout since
+                    // it is kina confusing, hovewer it would be good to have some
+                    // configuration option to be able to display it as well.
+                    //
+
+                    //var typeLayout         = compiledType.ToLayout(@private: true);
+                    //typesMemoryLayouts.Add(typeLayout);
+
 
                     //
                     // Get all nested types and decompile them as well.
@@ -681,7 +690,10 @@ namespace PowerUp.Watcher
                     foreach (var type in types)
                     {
                         var innerMethods = type.ToAsm(@private: true);
+                        var nestedLayout = type.ToLayout(@private: true);
+
                         AddMethodsToGlobalList(innerMethods, globalMethodList);
+                        typesMemoryLayouts.Add(nestedLayout);
                     }
                     //
                     // Run operations such as Benchmarking, Running and Interactive printing.
@@ -789,7 +801,7 @@ namespace PowerUp.Watcher
                     ILDecompiler iLDecompiler = new ILDecompiler();
                     unit.ILCode = iLDecompiler.ToIL(assemblyStream, pdbStream);
                     unit.DecompiledMethods = globalMethodList.ToArray();
-                    unit.TypeLayouts = typesMemoryLayouts;
+                    unit.TypeLayouts = typesMemoryLayouts.ToArray();
                 }
             }
 
@@ -822,12 +834,12 @@ namespace PowerUp.Watcher
             }
         }
 
-        private void RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType, DecompiledMethod[] decompiledMethods, TypeLayout[] typeLayouts)
+        private void RunPostCompilationOperations(Assembly loadedAssembly, Type compiledType, DecompiledMethod[] decompiledMethods, List<TypeLayout> typeLayouts)
         {
             var methods = compiledType.GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
             RunPostCompilationOperations(loadedAssembly, decompiledMethods, methods, typeLayouts);
         }
-        private void RunPostCompilationOperations(Assembly loadedAssembly, DecompiledMethod[] decompiledMethods, MethodInfo[] methodInfos, TypeLayout[] typeLayouts)
+        private void RunPostCompilationOperations(Assembly loadedAssembly, DecompiledMethod[] decompiledMethods, MethodInfo[] methodInfos, List<TypeLayout> typeLayouts)
         {
             List<string> messages = new List<string>();
             int order = 1;

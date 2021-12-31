@@ -11,9 +11,8 @@ namespace PowerUp.Core.Decompilation
 {
     public static class JitExtensions
     {
-        public static TypeLayout[] ToLayout(this Type typeInfo, bool @private = false)
+        public static TypeLayout ToLayout(this Type typeInfo, bool @private = false, object[] parameters = null)
         {
-            List<TypeLayout> types = new List<TypeLayout>();
             var decompiler = new JitCodeDecompiler();
 
             var flags = BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance;
@@ -22,34 +21,82 @@ namespace PowerUp.Core.Decompilation
                 flags |= BindingFlags.NonPublic;
             }
 
-            foreach(var type in typeInfo.GetNestedTypes(flags))
+            if(parameters == null)
+                parameters = TryGetConstructorParameters(typeInfo);
+
+            //
+            // Get the layout:
+            // To be able to create the object we need to call it's constructor.
+            // The constructor parameters can be passed from the caller, or set by an Contructor Attribute
+            // or guessed with some accuracy.
+            //
+            if (HasDefaultConstructorOrIsStruct(typeInfo) || parameters != null)
             {
-                //
-                // Get the layout:
-                // To be able to create the object we need to call it's constructor.
-                // @TODO: For now we shall only support a default contructor, but later
-                // we should add a feature where the constructor can be picked and filled using
-                // correct parameters.
-                //
-                if (HasDefaultConstructorOrIsStruct(type))
+                var obj = Activator.CreateInstance(typeInfo, parameters);
+                var typeMemLayout = decompiler.GetTypeLayoutFromHeap(typeInfo, obj);
+
+                return typeMemLayout;
+            }
+            else
+            {
+                return new TypeLayout()
                 {
-                    var obj = type.Assembly.CreateInstance(type.FullName);
-                    var typeMemLayout = decompiler.GetTypeLayoutFromHeap(type, obj);
-                    if (typeMemLayout != null)
-                        types.Add(typeMemLayout);
-                }
-                else
+                    Name = typeInfo.Name,
+                    IsValid = false,
+                    Message = @"Type Layout requires a default constructor"
+                };
+            }
+        }
+
+        private static object[] TryGetConstructorParameters(Type typeInfo)
+        {
+            object[] values = null;
+            //
+            // Try and get constructor params from an attribute if present.
+            // If it's not present there should be a way to guess them with good
+            // accuracy; here's how we're going to do it:
+            //
+            // - ValueTypes can be just instantiated
+            // - ReferenceTypes can be null
+            //
+            var attrs = typeInfo.GetCustomAttributes();
+            foreach (var attr in attrs)
+            {
+                var type = attr.GetType();
+                if (type.Name == "ConstructorAttribute")
                 {
-                    types.Add(new TypeLayout() 
-                    { 
-                        Name = type.Name, 
-                        IsValid = false, 
-                        Message = @"Type Layout requires a default constructor" 
-                    });
+                    var props = type.GetProperties();
+                    var parameters = props.First(x => x.Name == "Parameters");
+                    values = (object[])parameters.GetValue(attr);
+                    break;
                 }
             }
+            //
+            // Guess values
+            //
+            if (values == null)
+            {
+                var constructor = typeInfo.GetConstructors().First();
+                var parameters  = constructor.GetParameters();
+                values = new object[parameters.Length];
 
-            return types.ToArray(); 
+                int idx = 0;
+                foreach (var param in parameters)
+                {
+                    if (param.ParameterType.IsValueType)
+                    {
+                        values[idx] = Activator.CreateInstance(param.ParameterType);
+                    }
+                    else
+                    {
+                        values[idx] = null;
+                    }
+
+                    idx++;
+                }
+
+            }
+            return values;
         }
 
 

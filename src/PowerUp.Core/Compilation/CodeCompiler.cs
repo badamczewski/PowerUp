@@ -89,7 +89,6 @@ namespace PowerUp.Core.Compilation
             var benchCode  = rewriter.GetBenchCodeOrEmpty();
             var usingCode  = rewriter.GetUsingsOrEmpty();
             var sizeOfCode = rewriter.GetStructSizeOrEmpty();
-
             var sourceCode = $@"
                     using System.Linq;
                     using System.Diagnostics;
@@ -116,6 +115,22 @@ namespace PowerUp.Core.Compilation
                         public Type[] Types
                         {{
                             get {{ return _types; }}
+                        }}
+                    }}
+
+                    [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
+                    sealed class ConstructorAttribute : Attribute
+                    {{
+                        private Object[] _parameters;
+
+                        public ConstructorAttribute(params Object[] parameters)
+                        {{
+                            _parameters = parameters;
+                        }}
+
+                        public Object[] Parameters
+                        {{
+                            get {{ return _parameters; }}
                         }}
                     }}
 
