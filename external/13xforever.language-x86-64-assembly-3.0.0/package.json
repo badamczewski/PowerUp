@@ -1,0 +1,54 @@
+{
+	"name": "language-x86-64-assembly",
+	"displayName": "x86 and x86_64 Assembly",
+	"description": "Cutting edge x86 and x86_64 assembly syntax highlighting",
+	"version": "3.0.0",
+	"preview": false,
+	"icon": "logo.png",
+	"engines": {
+		"vscode": "^1.0.0"
+	},
+	"author": {
+		"name": "Ilya Veselov"
+	},
+	"publisher": "13xforever",
+	"contributes": {
+		"languages": [
+			{
+				"id": "asm-intel-x86-generic",
+				"aliases": [
+					"x86 and x86_64 Assembly",
+					"asm-intel-x86-generic"
+				],
+				"extensions": [
+					".asm",
+					".nasm",
+					".yasm",
+					".inc",
+					".s"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "asm-intel-x86-generic",
+				"scopeName": "source.asm.x86_64",
+				"path": "./syntaxes/language-x86_64-assembly.tmLanguage"
+			}
+		]
+	},
+	"categories": [
+		"Languages"
+	],
+	"repository": {
+		"url": "https://github.com/13xforever/x86_64-assembly-vscode",
+		"type": "git"
+	},
+	"__metadata": {
+		"id": "7c8fcf53-a602-48d2-afdf-9c1318472604",
+		"publisherId": "1e9b49a6-88ea-4661-8c1b-c7a713cebd78",
+		"publisherDisplayName": "13xforever",
+		"installedTimestamp": 1633889877937
+	}
+}
