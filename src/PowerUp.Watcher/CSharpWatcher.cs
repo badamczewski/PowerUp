@@ -519,8 +519,8 @@ namespace PowerUp.Watcher
                     int idx = 0;
                     foreach (var arg in inst.Arguments)
                     {
-                        var argumentValue = CreateArgument(method.CodeAddress, method.CodeSize, inst, arg, idx == inst.Arguments.Length - 1, unit.Options);
-                        lineBuilder.Append(argumentValue);
+                        var isLast = idx == inst.Arguments.Length - 1;
+                        writer.AppendArgument(lineBuilder, method, inst, arg, isLast, unit.Options);
                         idx++;
                     }
 
@@ -533,71 +533,6 @@ namespace PowerUp.Watcher
                     builder.Append(lineBuilder.ToString());
                     builder.AppendLine();
                 }
-            }
-
-            return builder.ToString();
-        }
-
-        private string CreateArgument(ulong methodAddress, ulong codeSize, AssemblyInstruction instruction, InstructionArg arg, bool isLast, Core.Compilation.CompilationOptions options)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            if (instruction.jumpDirection != JumpDirection.None)
-            {
-                var addressInArg = arg.Value.LastIndexOf(' ');
-                var value = arg.Value;
-                if (addressInArg != -1)
-                {
-                    value = arg.Value.Substring(0, addressInArg);
-                }
-
-                builder.Append($"{value.Trim()}");
-                if(options.ShortAddresses)
-                    builder.Append($" {instruction.RefAddress.ToString("X").Substring(options.AddressesCutByLength)}");
-                else
-                    builder.Append($" {instruction.RefAddress.ToString("X")}");
-
-                if (instruction.jumpDirection == JumpDirection.Out)
-                    builder.Append($" ↷");
-                else if (instruction.jumpDirection == JumpDirection.Up)
-                    builder.Append($" ⇡");
-                else if (instruction.jumpDirection == JumpDirection.Down)
-                    builder.Append($" ⇣");
-            }
-            else
-            {
-
-                
-                //Parse Value
-                var value = arg.Value.Trim();
-                var code = string.Empty;
-                for (int i = 0; i < value.Length; i++)
-                {
-                    var c = value[i];
-                    if (c == ']' || c == '[' || c == '+' || c == '-' || c == '*')
-                    {
-                        if (string.IsNullOrEmpty(code) == false)
-                        {
-                            builder.Append($"{code}");
-                            code = string.Empty;
-                        }
-
-                        builder.Append($"{c}");
-                    }
-                    else
-                    {
-                        code += c;
-                    }
-                }
-                if (string.IsNullOrEmpty(code) == false)
-                {
-                    builder.Append($"{code}");
-                }
-            }
-
-            if (isLast == false)
-            {
-                builder.Append($", ");
             }
 
             return builder.ToString();

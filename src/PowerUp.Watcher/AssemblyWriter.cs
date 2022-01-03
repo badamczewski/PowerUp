@@ -114,6 +114,99 @@ namespace PowerUp.Watcher
 
             methodBuilder.AppendLine("):");
         }
+
+        public void AppendArgument(StringBuilder lineBuilder, DecompiledMethod method, AssemblyInstruction instruction, InstructionArg arg, bool isLast, Core.Compilation.CompilationOptions options)
+        {
+            //
+            // Check if the instruction was a jump, since jumps need a very special handling,
+            // that is slightly different per compiler (but we managed to come up with a sensible default)
+            //
+            if (instruction.jumpDirection != JumpDirection.None)
+            {
+                //
+                // Try to separate the value from the address or anything else that might be there.
+                //
+                var addressOrAnyInArg = arg.Value.LastIndexOf(' ');
+                var value = arg.Value;
+                if (addressOrAnyInArg != -1)
+                {
+                    value = arg.Value.Substring(0, addressOrAnyInArg);
+                }
+
+                //
+                // The argument is a jump and since we support many flavors of jumps (from many languages, and compilers),
+                // the argument value will most likley be eiter a lablel (LB0001) or reference to a call (THROW_HELPER).
+                // The correct address will be stored in the RefAddress.
+                //
+                // For compilers like Rust (and LLVM) there will be no RefAdress but the label will fill the same function.
+                //
+                lineBuilder.Append($"{value.Trim()}");
+                if (instruction.RefAddress > 0)
+                {
+                    var addressValue = instruction.RefAddress.ToString("X");
+                    //
+                    // The option to shorten addresses was selected but we cannot trim them to len < 0
+                    //
+                    if (options.ShortAddresses)
+                    {
+                        var cutBy = options.AddressesCutByLength;
+                        if (addressValue.Length < options.AddressesCutByLength)
+                            cutBy = addressValue.Length;
+
+                        lineBuilder.Append($" {addressValue.Substring(options.AddressesCutByLength)}");
+                    }
+                    else
+                        lineBuilder.Append($" {addressValue}");
+                }
+
+                //
+                // Render jump direction guides.
+                //
+                if (instruction.jumpDirection == JumpDirection.Out)
+                    lineBuilder.Append($" ↷");
+                else if (instruction.jumpDirection == JumpDirection.Up)
+                    lineBuilder.Append($" ⇡");
+                else if (instruction.jumpDirection == JumpDirection.Down)
+                    lineBuilder.Append($" ⇣");
+            }
+            else
+            {
+                //
+                // The instruction wasn't a jump so this will be a standard value
+                // meaning that it will be an const, register, operator, or array access
+                //
+                var value = arg.Value.Trim();
+                var code = string.Empty;
+                for (int i = 0; i < value.Length; i++)
+                {
+                    var c = value[i];
+                    if (c == ']' || c == '[' || c == '+' || c == '-' || c == '*')
+                    {
+                        if (string.IsNullOrEmpty(code) == false)
+                        {
+                            lineBuilder.Append($"{code}");
+                            code = string.Empty;
+                        }
+
+                        lineBuilder.Append($"{c}");
+                    }
+                    else
+                    {
+                        code += c;
+                    }
+                }
+                if (string.IsNullOrEmpty(code) == false)
+                {
+                    lineBuilder.Append($"{code}");
+                }
+            }
+
+            if (isLast == false)
+            {
+                lineBuilder.Append($", ");
+            }
+        }
+
         public void AppendMessages(StringBuilder methodBuilder, DecompiledMethod method)
         {
             //
