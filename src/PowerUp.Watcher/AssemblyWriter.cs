@@ -85,8 +85,12 @@ namespace PowerUp.Watcher
                 var hexSize = AddressPad;
                 hexPad = new string('0', hexSize - address.Length);
             }
-
-            if (cutBy > 0)
+            //
+            // The option to shorten addresses was selected but we cannot trim them to len < 0
+            //
+            if (address.Length < cutBy)
+                lineBuilder.Append($"{hexPad} ");
+            else if (cutBy > 0)
                 lineBuilder.Append($"{hexPad}{address.Substring(cutBy)}: ");
             else
                 lineBuilder.Append($"{hexPad}{address}: ");
@@ -275,6 +279,32 @@ namespace PowerUp.Watcher
                     if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
 
                     lineBuilder.Append($" # {lhs} = {rhs}");
+                }
+                else if (instruction.Instruction == "shl")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                    if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
+                    if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
+
+                    lineBuilder.Append($" # {lhs} << {rhs}");
+                }
+                else if (instruction.Instruction == "shr")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                    if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
+                    if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
+
+                    lineBuilder.Append($" # {lhs} >> {rhs}");
                 }
                 else if (instruction.Instruction == "lea")
                 {
