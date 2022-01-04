@@ -3,7 +3,7 @@
 
 [![.NET](https://github.com/badamczewski/PowerUp/actions/workflows/dotnet.yml/badge.svg)](https://github.com/badamczewski/PowerUp/actions/workflows/dotnet.yml)
 
-### **PowerUp** is a collection or productivity utilities, disassembly and decompilation tools for multiple languages and platforms.
+### **PowerUp** is a collection of productivity utilities, disassembly and decompilation tools for multiple languages and platforms.
 
 The project features the following utilities and tools:
 
