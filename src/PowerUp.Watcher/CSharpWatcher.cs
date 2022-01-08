@@ -171,6 +171,12 @@ namespace PowerUp.Watcher
                                     unit = DecompileToASM(code);
                                 }
 
+                                //
+                                // Hide internal methods that get produced by the IL Compiler and C# Compiler
+                                //
+                                HideInternalDecompiledMethods(unit.DecompiledMethods);
+
+
                                 lastWrite = fileInfo.LastWriteTime;
                                 lastCode = code;
 
@@ -198,7 +204,7 @@ namespace PowerUp.Watcher
                                     {
                                         asmCode = ToAsmString(unit);
                                     }
-                                    if (unit.ILCode != null)
+                                    if (unit.ILTokens != null)
                                     {
                                         ilCode = ToILString(unit);
                                     }
@@ -237,6 +243,115 @@ namespace PowerUp.Watcher
             return iDontCareAboutThisTask;
         }
 
+        public void ParseIL(DecompilationUnit unit)
+        {
+            var na = new ILToken();
+            ILToken next = na;
+
+            bool isMethodContext = false;
+
+            int methodIndent = 0;
+            int methodILStartIndex = 0;
+            int methodILEndIndex = 0;
+            DecompiledMethod refMethod = null;
+
+            var methods = unit.DecompiledMethods.ToDictionary(k => k.Name, v => v);
+
+            for (int i = 0; i < unit.ILTokens.Length; i++)
+            {
+                var il = unit.ILTokens[i];
+                if (i + 1 < unit.ILTokens.Length)
+                {
+                    next = unit.ILTokens[i + 1];
+                }
+                else
+                {
+                    next = na;
+                }
+
+                switch (il.Type)
+                {
+                    case ILTokenType.Char:
+                        break;
+                    case ILTokenType.LocalRef:
+                        break;
+                    case ILTokenType.Ref:
+                        //
+                        // We are enterinng method context.
+                        //
+                        if (il.Value == ".method")
+                        {
+                            isMethodContext = true;
+                            methodILStartIndex = i;
+                        }
+
+
+
+                        break;
+                    case ILTokenType.Text:
+
+                        string value = il.Value;
+
+                        if (methods.TryGetValue(value, out var method) && isMethodContext)
+                        {
+                            refMethod = method;
+                        }
+
+                        if (value.StartsWith("{"))
+                        {
+                            //
+                            // This marks the start of the method.
+                            //
+                            if (isMethodContext)
+                            {
+                                methodIndent++;
+                            }
+                        }
+                        else if (value.StartsWith("}"))
+                        {
+                            //
+                            // Methods in IL can have nested lexical scopes so
+                            // we need to count them and act only when we have no lexical scopes
+                            // this will mark method end.
+                            //
+                            if (isMethodContext) methodIndent--;
+                            //
+                            // Is this end of the method IL ?
+                            //
+                            if (methodIndent == 0 && isMethodContext && refMethod != null)
+                            {
+                                isMethodContext = false;
+                                methodILEndIndex = i;
+
+                                refMethod.ILOffsetStart = methodILStartIndex;
+                                refMethod.ILOffsetEnd = methodILEndIndex;
+
+                                methodILStartIndex = -1;
+                                methodILEndIndex = -1;
+                                refMethod = null;
+                            }
+                        }
+
+                        break;
+                    case ILTokenType.NewLine:
+                        break;
+                    case ILTokenType.OpCode:
+                        if (next.Type == ILTokenType.LocalRef)
+                        {
+                            i++;
+                        }
+
+                        break;
+                    case ILTokenType.Indent:
+                        break;
+                    case ILTokenType.Unindent:
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
         public string ToILString(DecompilationUnit unit)
         {
             StringBuilder builder = new StringBuilder();
@@ -247,13 +362,22 @@ namespace PowerUp.Watcher
             string indent = new string(' ', indentLevel);
             var na = new ILToken();
             ILToken next = na;
-
-            for (int i = 0; i < unit.ILCode.Length; i++)
+         
+            for (int i = 0; i < unit.ILTokens.Length; i++)
             {
-                var il = unit.ILCode[i];
-                if (i + 1 < unit.ILCode.Length)
+                foreach(var method in unit.DecompiledMethods)
                 {
-                    next = unit.ILCode[i + 1];
+                    if (method.IsVisible == false && i == method.ILOffsetStart)
+                    {
+                        i = method.ILOffsetEnd + 1;
+                        break;
+                    }
+                }
+
+                var il = unit.ILTokens[i];
+                if (i + 1 < unit.ILTokens.Length)
+                {
+                    next = unit.ILTokens[i + 1];
                 }
                 else
                 {
@@ -272,11 +396,8 @@ namespace PowerUp.Watcher
                         builder.Append($"{il.Value}");
                         break;
                     case ILTokenType.Text:
-                        //
-                        // Remove comments.
-                        //
-                        string value = il.Value;
 
+                        string value = il.Value;
                         if (value.StartsWith("{"))
                         {
                             indentLevel += 4;
@@ -290,6 +411,9 @@ namespace PowerUp.Watcher
                             builder.Append($"\r\n{indent}");
                         }
 
+                        //
+                        // Remove comments.
+                        //
                         var commentsIdx = value.IndexOf("//");
                         if (commentsIdx != -1) value = value.Substring(0, commentsIdx);
 
@@ -478,7 +602,7 @@ namespace PowerUp.Watcher
 
             foreach (var method in unit.DecompiledMethods)
             {
-                if (method == null) continue;
+                if (method == null || method.IsVisible == false) continue;
 
                 (int jumpSize, int nestingLevel) sizeAndNesting = (-1,-1);
                 sizeAndNesting = JumpGuideDetector.PopulateGuides(method);
@@ -556,7 +680,6 @@ namespace PowerUp.Watcher
                     .CompiledType
                     .ToAsm(@private: true);
                 decompilationUnit.DecompiledMethods = result;
-
             }
 
             return decompilationUnit;
@@ -636,7 +759,6 @@ namespace PowerUp.Watcher
                     // to the IL and ASM outputs we need to hide them.
                     //
                     RunPostCompilationOperations(loaded, compiledType, decompiledMethods, typesMemoryLayouts);
-                    HideInternalDecompiledMethods(decompiledMethods);
                     AddMethodsToGlobalList(decompiledMethods, globalMethodList);
 
                     assemblyStream.Position = 0;
@@ -734,9 +856,10 @@ namespace PowerUp.Watcher
                         }
                     }
                     ILDecompiler iLDecompiler = new ILDecompiler();
-                    unit.ILCode = iLDecompiler.ToIL(assemblyStream, pdbStream);
+                    unit.ILTokens = iLDecompiler.ToIL(assemblyStream, pdbStream);
                     unit.DecompiledMethods = globalMethodList.ToArray();
                     unit.TypeLayouts = typesMemoryLayouts.ToArray();
+                    ParseIL(unit);
                 }
             }
 
@@ -759,13 +882,13 @@ namespace PowerUp.Watcher
         private void HideInternalDecompiledMethods(DecompiledMethod[] methods)
         {
             //
-            // Null the benchmark method so it's not displayed.
+            // Some internal methods should not be displayed in X86 or IR.
             //
             for (int i = 0; i < methods.Length; i++)
             {
-                if (methods[i].Name.StartsWith("Bench_"))       methods[i] = null;
-                else if (methods[i].Name == "Print")            methods[i] = null;
-                else if (methods[i].Name.StartsWith("SizeOf_")) methods[i] = null;
+                if (methods[i].Name.StartsWith("Bench_"))       methods[i].IsVisible = false;
+                else if (methods[i].Name == "Print")            methods[i].IsVisible = false;
+                else if (methods[i].Name.StartsWith("SizeOf_")) methods[i].IsVisible = false;
             }
         }
 

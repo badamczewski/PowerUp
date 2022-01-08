@@ -12,7 +12,7 @@ namespace PowerUp.Core.Decompilation
         public Error[] Errors { get; set; }  = Array.Empty<Error>();
         public DecompiledMethod[] DecompiledMethods { get; set; }
         public TypeLayout[] TypeLayouts { get; set; }
-        public ILToken[] ILCode { get; set; }
+        public ILToken[] ILTokens { get; set; }
         public string[] Messages { get; set; } = Array.Empty<string>();
         public CompilationOptions Options { get; set; }
     }
@@ -51,6 +51,11 @@ namespace PowerUp.Core.Decompilation
         public string[] Arguments { get; set; }
         public List<AssemblyInstruction> Instructions { get; set; }
             = new List<AssemblyInstruction>();
+
+        public int ILOffsetStart { get; set; }
+        public int ILOffsetEnd { get; set;}
+
+        public bool IsVisible { get; set; } = true;
 
         public uint CodeSize { get; set; }
         public ulong CodeAddress { get; set; }
