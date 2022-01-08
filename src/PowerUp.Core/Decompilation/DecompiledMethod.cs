@@ -43,23 +43,46 @@ namespace PowerUp.Core.Decompilation
         }
     }
 
-    public class DecompiledMethod
+    public class MethodSignature
     {
         public string TypeName { get; set; }
         public string Name { get; set; }
         public string Return { get; set; }
         public string[] Arguments { get; set; }
+
+        public string ToMethodCallSignature()
+        {
+            StringBuilder sigBuilder = new StringBuilder();
+            sigBuilder.Append(TypeName);
+            sigBuilder.Append(".");
+            sigBuilder.Append(Name);
+            sigBuilder.Append("(");
+
+            int index = 1;
+            foreach (var arg in Arguments)
+            {
+                sigBuilder.Append(arg);
+                if (index < Arguments.Length)
+                    sigBuilder.Append(", ");
+                index++;
+            }
+            sigBuilder.Append(")");
+            return sigBuilder.ToString();
+        }
+    }
+
+
+    public class DecompiledMethod : MethodSignature
+    {
         public List<AssemblyInstruction> Instructions { get; set; }
             = new List<AssemblyInstruction>();
-
         public int ILOffsetStart { get; set; }
         public int ILOffsetEnd { get; set;}
-
         public bool IsVisible { get; set; } = true;
-
         public uint CodeSize { get; set; }
         public ulong CodeAddress { get; set; }
         public List<string> Messages { get; set; } = new();
+        public List<MethodSignature> Calls { get; set; } = new();
         public override string ToString()
         {
             StringBuilder builder = new StringBuilder();

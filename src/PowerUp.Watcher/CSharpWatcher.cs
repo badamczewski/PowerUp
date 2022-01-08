@@ -171,12 +171,6 @@ namespace PowerUp.Watcher
                                     unit = DecompileToASM(code);
                                 }
 
-                                //
-                                // Hide internal methods that get produced by the IL Compiler and C# Compiler
-                                //
-                                HideInternalDecompiledMethods(unit.DecompiledMethods);
-
-
                                 lastWrite = fileInfo.LastWriteTime;
                                 lastCode = code;
 
@@ -202,6 +196,11 @@ namespace PowerUp.Watcher
                                 {
                                     if (unit.DecompiledMethods != null)
                                     {
+                                        //
+                                        // Hide internal methods that get produced by the IL Compiler and C# Compiler
+                                        //
+                                        HideInternalDecompiledMethods(unit.DecompiledMethods);
+
                                         asmCode = ToAsmString(unit);
                                     }
                                     if (unit.ILTokens != null)
@@ -241,115 +240,6 @@ namespace PowerUp.Watcher
                 }  
             });
             return iDontCareAboutThisTask;
-        }
-
-        public void ParseIL(DecompilationUnit unit)
-        {
-            var na = new ILToken();
-            ILToken next = na;
-
-            bool isMethodContext = false;
-
-            int methodIndent = 0;
-            int methodILStartIndex = 0;
-            int methodILEndIndex = 0;
-            DecompiledMethod refMethod = null;
-
-            var methods = unit.DecompiledMethods.ToDictionary(k => k.Name, v => v);
-
-            for (int i = 0; i < unit.ILTokens.Length; i++)
-            {
-                var il = unit.ILTokens[i];
-                if (i + 1 < unit.ILTokens.Length)
-                {
-                    next = unit.ILTokens[i + 1];
-                }
-                else
-                {
-                    next = na;
-                }
-
-                switch (il.Type)
-                {
-                    case ILTokenType.Char:
-                        break;
-                    case ILTokenType.LocalRef:
-                        break;
-                    case ILTokenType.Ref:
-                        //
-                        // We are enterinng method context.
-                        //
-                        if (il.Value == ".method")
-                        {
-                            isMethodContext = true;
-                            methodILStartIndex = i;
-                        }
-
-
-
-                        break;
-                    case ILTokenType.Text:
-
-                        string value = il.Value;
-
-                        if (methods.TryGetValue(value, out var method) && isMethodContext)
-                        {
-                            refMethod = method;
-                        }
-
-                        if (value.StartsWith("{"))
-                        {
-                            //
-                            // This marks the start of the method.
-                            //
-                            if (isMethodContext)
-                            {
-                                methodIndent++;
-                            }
-                        }
-                        else if (value.StartsWith("}"))
-                        {
-                            //
-                            // Methods in IL can have nested lexical scopes so
-                            // we need to count them and act only when we have no lexical scopes
-                            // this will mark method end.
-                            //
-                            if (isMethodContext) methodIndent--;
-                            //
-                            // Is this end of the method IL ?
-                            //
-                            if (methodIndent == 0 && isMethodContext && refMethod != null)
-                            {
-                                isMethodContext = false;
-                                methodILEndIndex = i;
-
-                                refMethod.ILOffsetStart = methodILStartIndex;
-                                refMethod.ILOffsetEnd = methodILEndIndex;
-
-                                methodILStartIndex = -1;
-                                methodILEndIndex = -1;
-                                refMethod = null;
-                            }
-                        }
-
-                        break;
-                    case ILTokenType.NewLine:
-                        break;
-                    case ILTokenType.OpCode:
-                        if (next.Type == ILTokenType.LocalRef)
-                        {
-                            i++;
-                        }
-
-                        break;
-                    case ILTokenType.Indent:
-                        break;
-                    case ILTokenType.Unindent:
-                        break;
-                    default:
-                        break;
-                }
-            }
         }
 
         public string ToILString(DecompilationUnit unit)
@@ -446,8 +336,6 @@ namespace PowerUp.Watcher
             }
             return builder.ToString();
         }
-
-
 
         private string ToLayout(TypeLayout[] typeLayouts)
         {
@@ -605,7 +493,8 @@ namespace PowerUp.Watcher
                 if (method == null || method.IsVisible == false) continue;
 
                 (int jumpSize, int nestingLevel) sizeAndNesting = (-1,-1);
-                sizeAndNesting = JumpGuideDetector.PopulateGuides(method);
+                sizeAndNesting    = JumpGuideDetector.PopulateGuides(method);
+                var inliningCalls = InlineDetector.DetectInlining(method);
 
                 //
                 // Print messages.
@@ -614,7 +503,16 @@ namespace PowerUp.Watcher
                 //
                 // Write out method signature.
                 //
+                // Don't show the base type method types.
+                // (This is specific to the C# outputs)
+                //
+                if (method.TypeName == CodeCompiler.BaseClassName) method.TypeName = null;
                 writer.AppendMethodSignature(builder, method);
+
+                foreach(var inliningCall in inliningCalls)
+                {
+                    builder.AppendLine("  " + XConsole.ConsoleBorderStyle.Bullet + "inlined" + " " + inliningCall);
+                }
 
                 foreach (var inst in method.Instructions)
                 {
@@ -859,7 +757,12 @@ namespace PowerUp.Watcher
                     unit.ILTokens = iLDecompiler.ToIL(assemblyStream, pdbStream);
                     unit.DecompiledMethods = globalMethodList.ToArray();
                     unit.TypeLayouts = typesMemoryLayouts.ToArray();
-                    ParseIL(unit);
+
+                    //
+                    // Parse and detect method calls in IL to be able to do inline tracing
+                    //
+                    ILAnalyzer analyzer = new ILAnalyzer();
+                    analyzer.Analyze(unit);
                 }
             }
 
@@ -871,10 +774,6 @@ namespace PowerUp.Watcher
             foreach (var method in methods)
             {
                 if (method == null) continue;
-                //
-                // Don't show the base type method types.
-                //
-                if (method.TypeName == CodeCompiler.BaseClassName) method.TypeName = null;
                 totalMethodsToAdd.Add(method);
             }
         }
