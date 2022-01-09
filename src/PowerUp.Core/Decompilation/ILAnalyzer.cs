@@ -16,7 +16,6 @@ namespace PowerUp.Core.Decompilation
             Name,
             Args
         }
-
         public void Analyze(DecompilationUnit unit)
         {
             var na = new ILToken();
@@ -64,10 +63,10 @@ namespace PowerUp.Core.Decompilation
                     case ILTokenType.Text:
 
                         string value = il.Value;
-
                         if (methods.TryGetValue(value, out var method) && isMethodContext)
                         {
                             refMethod = method;
+                            methodIndent = 0;
                         }
 
                         if (value.StartsWith("{"))

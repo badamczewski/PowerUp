@@ -268,7 +268,6 @@ namespace PowerUp.Core.Decompilation
             {
                 var clrVersion = dataTarget.ClrVersions.First();
                 var runtime = clrVersion.CreateRuntime();
-
                 //
                 // Attempt to make ClrMd aware of recent jitting:
                 //
@@ -322,7 +321,7 @@ namespace PowerUp.Core.Decompilation
                 // metadata, which should be somewhere in the code header (JITType field)
                 //
                 var sos = runtime.DacLibrary.SOSDacInterface;
-
+                
                 if (sos.GetMethodDescData(handleValue, 0, out var data))
                 {
                     var slot = sos.GetMethodTableSlot(data.MethodTable, data.SlotNumber);

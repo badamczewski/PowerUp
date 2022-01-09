@@ -27,6 +27,8 @@ using static PowerUp.Core.Console.XConsole;
 using System.Diagnostics;
 using TypeLayout = PowerUp.Core.Decompilation.TypeLayout;
 using System.Collections;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
 
 namespace PowerUp.Watcher
 {
@@ -35,7 +37,6 @@ namespace PowerUp.Watcher
         private IConfigurationRoot _configuration;
 
         private CodeCompiler _compiler     = null;
-        private ILDecompiler _iLDecompiler = new ILDecompiler();
         private ILCompiler   _iLCompiler   = new ILCompiler();
 
         private bool _unsafeUseTieredCompilation = false;
@@ -203,6 +204,7 @@ namespace PowerUp.Watcher
 
                                         asmCode = ToAsmString(unit);
                                     }
+                                    // 
                                     if (unit.ILTokens != null)
                                     {
                                         ilCode = ToILString(unit);
@@ -244,97 +246,7 @@ namespace PowerUp.Watcher
 
         public string ToILString(DecompilationUnit unit)
         {
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine();
-
-            int indentLevel = 0;
-            int opCodeIndentLen = 12;
-            string indent = new string(' ', indentLevel);
-            var na = new ILToken();
-            ILToken next = na;
-         
-            for (int i = 0; i < unit.ILTokens.Length; i++)
-            {
-                foreach(var method in unit.DecompiledMethods)
-                {
-                    if (method.IsVisible == false && i == method.ILOffsetStart)
-                    {
-                        i = method.ILOffsetEnd + 1;
-                        break;
-                    }
-                }
-
-                var il = unit.ILTokens[i];
-                if (i + 1 < unit.ILTokens.Length)
-                {
-                    next = unit.ILTokens[i + 1];
-                }
-                else
-                {
-                    next = na;
-                }
-
-                switch (il.Type)
-                {
-                    case ILTokenType.Char:
-                        builder.Append($"{il.Value}");
-                        break;
-                    case ILTokenType.LocalRef:
-                        builder.Append($"{il.Value}");
-                        break;
-                    case ILTokenType.Ref:
-                        builder.Append($"{il.Value}");
-                        break;
-                    case ILTokenType.Text:
-
-                        string value = il.Value;
-                        if (value.StartsWith("{"))
-                        {
-                            indentLevel += 4;
-                            indent = new string(' ', indentLevel);
-                        }
-                        else if (value.StartsWith("}"))
-                        {
-                            indentLevel -= 4;
-                            if (indentLevel < 0) indentLevel = 0;
-                            indent = new string(' ', indentLevel);
-                            builder.Append($"\r\n{indent}");
-                        }
-
-                        //
-                        // Remove comments.
-                        //
-                        var commentsIdx = value.IndexOf("//");
-                        if (commentsIdx != -1) value = value.Substring(0, commentsIdx);
-
-                        builder.Append($"{value}");
-
-                        break;
-                    case ILTokenType.NewLine:
-                        builder.Append($"{il.Value}{indent}");
-                        break;
-                    case ILTokenType.OpCode:
-                        var offsetLen = opCodeIndentLen - il.Value.Length;
-                        if (offsetLen <= 0) offsetLen = 1;
-
-                        builder.Append($"{il.Value}{new string(' ', offsetLen)}");
-
-                        if(next.Type == ILTokenType.LocalRef)
-                        {
-                            i++;
-                        }
-
-                        break;
-                    case ILTokenType.Indent:
-                        break;
-                    case ILTokenType.Unindent:
-                        break;
-                    default:
-                        builder.Append($"{il.Value}{indent}");
-                        break;
-                }
-            }
-            return builder.ToString();
+            return new ILWriter().ToILString(unit);
         }
 
         private string ToLayout(TypeLayout[] typeLayouts)
@@ -593,6 +505,7 @@ namespace PowerUp.Watcher
             var compilation = _compiler.Compile(code);
             compilation.Options = WatcherUtils.SetCommandOptions(code, compilation.Options);
             unit.Options = compilation.Options;
+            unit.SouceCode = compilation.SourceCode;
 
             var compilationResult = compilation.CompilationResult;
             var assemblyStream = compilation.AssemblyStream;
@@ -661,6 +574,7 @@ namespace PowerUp.Watcher
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
+
                     //
                     // The code below creates a non collectible context (BAD) in order to be able to support
                     // features like PGO, QuickJIT and other future features that will recompile the method
@@ -753,8 +667,8 @@ namespace PowerUp.Watcher
                             }
                         }
                     }
-                    ILDecompiler iLDecompiler = new ILDecompiler();
-                    unit.ILTokens = iLDecompiler.ToIL(assemblyStream, pdbStream);
+                    ILDecompiler iLDecompiler = new ILDecompiler(assemblyStream, pdbStream);
+                    unit.ILTokens = iLDecompiler.ToIL(compiledType, new ILSourceMapProvider(pdbStream));
                     unit.DecompiledMethods = globalMethodList.ToArray();
                     unit.TypeLayouts = typesMemoryLayouts.ToArray();
 

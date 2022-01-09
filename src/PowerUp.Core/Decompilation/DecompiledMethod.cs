@@ -9,6 +9,7 @@ namespace PowerUp.Core.Decompilation
 {
     public class DecompilationUnit
     {
+        public string SouceCode { get; set; }
         public Error[] Errors { get; set; }  = Array.Empty<Error>();
         public DecompiledMethod[] DecompiledMethods { get; set; }
         public TypeLayout[] TypeLayouts { get; set; }
