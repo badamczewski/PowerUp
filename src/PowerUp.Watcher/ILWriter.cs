@@ -17,6 +17,8 @@ namespace PowerUp.Watcher
 
         public string ToILString(DecompilationUnit unit)
         {
+            var lines = unit.SouceCode.Split(Environment.NewLine);
+
             StringBuilder builder = new StringBuilder();
             builder.AppendLine();
 
@@ -88,7 +90,6 @@ namespace PowerUp.Watcher
                             // Let's parse this sequence point and get the relevant code line
                             //
                             var point = ParseSequencePoint(value);
-                            var lines = unit.SouceCode.Split(Environment.NewLine);
                             var startLine = lines[point.StartLine - 1];
                             var endLine = lines[point.EndLine - 1];
 
