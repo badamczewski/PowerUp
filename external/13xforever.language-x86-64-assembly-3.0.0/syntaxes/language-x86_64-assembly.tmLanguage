@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
+
+<!-- 
+    This is a modified version of the excelent 13xforever x86 ASM syntax.
+    It was modified to support PowerUp specific dissasembly features.
+
+    Modifications are tagged with @POWERUP to allow for easy search in the file.
+ --> 
 <dict>
 	<key>fileTypes</key>
 	<array>
@@ -1505,7 +1512,13 @@
 					<key>name</key>
 					<string>keyword.operator.word.mnemonic.vmx</string>
 				</dict>
-				<!--CUSTOM-->
+				<!--
+                    @POWERUP
+                    
+                    POWER UP SPECIFIC PATTERNS:
+                    This is a Custom Syntax Section that was created to support
+                    PowerUP Jump Guides and other Dissasembly Features.
+                -->
 				<dict>
 					<key>match</key>
 					<string>^\s*[#%]\s*(test)\b</string>
@@ -1518,6 +1531,13 @@
 					<key>name</key>
 					<string>storage.type.asm.x86_64</string>
 				</dict>
+                <dict>
+					<key>match</key>
+					<string>^\s*(◦inlined)\s*</string>
+					<key>name</key>
+					<string>storage.type.asm.x86_64</string>
+				</dict>
+                
 				<dict>
 					<key>match</key>
 					<string>(Void|System\.Byte|System\.Int16|System\.Int32|System\.Int64|System\.UInt64|System\.UInt32|System\.UInt16|System\.Double|System\.Decimal|System\.Float|System\.String|System\.Boolean)\s*</string>
@@ -1542,6 +1562,9 @@
 					<key>name</key>
 					<string>keyword.control.import.error.c</string>
 				</dict>
+                <!--
+                    POWER UP SPECIFIC PATTERNS END HERE
+                -->
 			</array>
 		</dict>
 		<key>preprocessor</key>
