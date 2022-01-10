@@ -12,7 +12,6 @@ namespace PowerUp.Core.Decompilation
 {
     public class ILToCodeMapProvider : IDisposable
     {
-        private Stream _pdbStream;
         private MetadataReaderProvider _metadataReaderProvider;
         private MetadataReader _metadataReader;
         private string _sourceCode;
