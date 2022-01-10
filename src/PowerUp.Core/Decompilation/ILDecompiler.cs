@@ -14,6 +14,7 @@ using System.IO;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
 using PowerUp.Core.Compilation;
+using System.Reflection.PortableExecutable;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -49,9 +50,6 @@ namespace PowerUp.Core.Decompilation
                 il = output.ILCodes;
             }
 
-            if (sourceMapProvider != null)
-                sourceMapProvider.Dispose();
-
             return il.ToArray();
         }
 
@@ -76,9 +74,6 @@ namespace PowerUp.Core.Decompilation
                 il = output.ILCodes;
             }
 
-            if (sourceMapProvider != null)
-                sourceMapProvider.Dispose();
-
             return il.ToArray();
         }
 
@@ -102,9 +97,6 @@ namespace PowerUp.Core.Decompilation
                 disassembler.DisassembleType(pEFile, (TypeDefinitionHandle)GetHandle(type));
                 il = output.ILCodes;
             }
-
-            if (sourceMapProvider != null)
-                sourceMapProvider.Dispose();
 
             return il.ToArray();
         }
@@ -139,7 +131,7 @@ namespace PowerUp.Core.Decompilation
             List<ICSharpCode.Decompiler.DebugInfo.SequencePoint> sequencePoints = new();
             var info = _metadataReader.GetMethodDebugInformation(method);
             var points = info.GetSequencePoints();
-
+           
             foreach (var point in points)
             {
                 sequencePoints.Add(new ICSharpCode.Decompiler.DebugInfo.SequencePoint() {

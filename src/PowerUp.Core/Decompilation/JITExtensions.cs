@@ -118,7 +118,7 @@ namespace PowerUp.Core.Decompilation
             return false;
         }
 
-        public static DecompiledMethod[] ToAsm(this Type typeInfo, bool @private = false)
+        public static DecompiledMethod[] ToAsm(this Type typeInfo, ILMethodMap[] sourceCodeMap = null, bool @private = false)
         {
             if (typeInfo.IsEnum)
                 return Array.Empty<DecompiledMethod>();
@@ -141,7 +141,7 @@ namespace PowerUp.Core.Decompilation
                 if (methodInfo.DeclaringType != typeof(System.Object) && 
                     methodInfo.DeclaringType != typeof(System.ValueType))
                 {
-                    var decompiledMethod = ToAsm(methodInfo);
+                    var decompiledMethod = ToAsm(methodInfo, sourceCodeMap);
                     methods.Add(decompiledMethod);
                 }
             }
@@ -158,7 +158,7 @@ namespace PowerUp.Core.Decompilation
         /// </summary>
         /// <param name="methodInfo"></param>
         /// <returns></returns>
-        public static DecompiledMethod ToAsm(this MethodInfo methodInfo)
+        public static DecompiledMethod ToAsm(this MethodInfo methodInfo, ILMethodMap[] sourceCodeMap = null)
         {
             var info = methodInfo;
             if (info.IsGenericMethod)
@@ -195,7 +195,7 @@ namespace PowerUp.Core.Decompilation
                 }               
             }
             RuntimeHelpers.PrepareMethod(info.MethodHandle);
-            var decompiler = new JitCodeDecompiler();
+            var decompiler = new JitCodeDecompiler(sourceCodeMap);
             var decompiled = decompiler.DecompileMethod(info);
 
             return decompiled;

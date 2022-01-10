@@ -8,6 +8,9 @@ using Microsoft.Diagnostics.Runtime;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using System.IO;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -21,6 +24,13 @@ namespace PowerUp.Core.Decompilation
         internal sealed class Pinnable
         {
             public ulong Pin;
+        }
+
+        private ILMethodMap[] _codeMap;
+
+        public JitCodeDecompiler(ILMethodMap[] codeMap = null)
+        {
+            _codeMap = codeMap;
         }
 
         //
@@ -278,8 +288,12 @@ namespace PowerUp.Core.Decompilation
 
                 var topLevelDelegateAddress = GetMethodAddress(runtime, method);
 
-                var decompiledMethod = DecompileMethod(runtime, topLevelDelegateAddress.codePointer,
-                    topLevelDelegateAddress.codeSize, functionCallName);
+                var decompiledMethod = DecompileMethod(runtime, 
+                    topLevelDelegateAddress.codePointer,
+                    topLevelDelegateAddress.codeSize,
+                    topLevelDelegateAddress.handle,
+                    topLevelDelegateAddress.ilToNativeCodeMap, 
+                    functionCallName);
 
                 var @params = method.GetParameters();
                 
@@ -297,11 +311,12 @@ namespace PowerUp.Core.Decompilation
             }
         }
 
-        public unsafe (ulong codePointer, uint codeSize) GetMethodAddress(ClrRuntime runtime, MethodInfo method)
+        public unsafe (ulong handle, ulong codePointer, uint codeSize, ILToNativeMap[] ilToNativeCodeMap) GetMethodAddress(ClrRuntime runtime, MethodInfo method)
         {
             var handleValue = (ulong)method.MethodHandle.Value.ToInt64();
             ulong codePtr = 0;
             uint  codeSize = 0;
+            ILToNativeMap[] iLToNativeMaps = null;
             //
             // For generic methods we need a different way of finding out the generic type implementation
             // that JIT has created.
@@ -321,14 +336,14 @@ namespace PowerUp.Core.Decompilation
                 // metadata, which should be somewhere in the code header (JITType field)
                 //
                 var sos = runtime.DacLibrary.SOSDacInterface;
-                
+
                 if (sos.GetMethodDescData(handleValue, 0, out var data))
                 {
                     var slot = sos.GetMethodTableSlot(data.MethodTable, data.SlotNumber);
-                    if(sos.GetCodeHeaderData(data.NativeCodeAddr, out var code))
+                    if (sos.GetCodeHeaderData(data.NativeCodeAddr, out var code))
                     {
-                        codePtr  = code.MethodStart;
-                        codeSize = code.HotRegionSize;     
+                        codePtr = code.MethodStart;
+                        codeSize = code.HotRegionSize;
                     }
                 }
             }
@@ -337,11 +352,12 @@ namespace PowerUp.Core.Decompilation
                 var clrmdMethodHandle = runtime.GetMethodByHandle(handleValue);
                 if (clrmdMethodHandle.NativeCode == 0) throw new InvalidOperationException($"Unable to disassemble method `{method}`");
 
-                codePtr  = clrmdMethodHandle.HotColdInfo.HotStart;
+                codePtr = clrmdMethodHandle.HotColdInfo.HotStart;
                 codeSize = clrmdMethodHandle.HotColdInfo.HotSize;
+                iLToNativeMaps = clrmdMethodHandle.ILOffsetMap;
             }
 
-            return (codePtr, codeSize);
+            return (handleValue, codePtr, codeSize, iLToNativeMaps);
         }
 
         public unsafe DecompiledMethod DecompileMethod(ulong codePtr, uint codeSize, string name)
@@ -360,11 +376,11 @@ namespace PowerUp.Core.Decompilation
                 // Link: https://github.com/microsoft/clrmd/issues/303
                 //
                 dataTarget.DataReader.Flush();
-                return DecompileMethod(runtime, codePtr, codeSize, name);
+                return DecompileMethod(runtime, codePtr, codeSize, 0, null, name);
             }
         }
 
-        public unsafe DecompiledMethod DecompileMethod(ClrRuntime runtime, ulong codePtr, uint codeSize, string functionCallName = null)
+        public unsafe DecompiledMethod DecompileMethod(ClrRuntime runtime, ulong codePtr, uint codeSize, ulong handle = 0, ILToNativeMap[] ilToNativeCodeMap = null, string functionCallName = null)
         {
             List<AssemblyInstruction> instructions = new List<AssemblyInstruction>();
 
@@ -386,6 +402,14 @@ namespace PowerUp.Core.Decompilation
 
                 if (instNameIndex != -1)
                     instructionName = inst.Substring(0, instNameIndex);
+
+                //
+                // Generate Source Code Instruction, provided that it maps 
+                // correctly to sequence points from the ilToNativeCodeMap.
+                //
+                var codeInstruction = TryGenerateSourceCodeMapForInstruction(handle, instruction.IP, ref instructionIndex, ilToNativeCodeMap);
+                if(codeInstruction != null)
+                    instructions.Add(codeInstruction);
 
                 //
                 // Parse Arguments
@@ -462,6 +486,51 @@ namespace PowerUp.Core.Decompilation
             };
         }
 
+        private AssemblyInstruction TryGenerateSourceCodeMapForInstruction(ulong methodHandle, ulong instructionIP, ref int instructionIndex, ILToNativeMap[] ilToNativeCodeMap = null)
+        {
+            AssemblyInstruction result = null;
+            if (ilToNativeCodeMap != null && _codeMap != null)
+            {
+                var codeMapEntry = _codeMap
+                    .Where(x => x.MethodHandle == methodHandle)
+                    .FirstOrDefault();
+
+                if (codeMapEntry != null)
+                {
+                    bool codeFound = false;
+                    foreach (var entry in ilToNativeCodeMap)
+                    {
+                        if (entry.StartAddress == instructionIP)
+                        {
+                            var value = entry.ILOffset.ToString();
+
+                            foreach (var code in codeMapEntry.CodeMap)
+                            {
+                                if (code.Offset == entry.ILOffset)
+                                {
+                                    value = code.SourceCodeBlock;
+                                    codeFound = true;
+                                    break;
+                                }
+                            }
+
+                            if (codeFound)
+                            {
+                                result = new AssemblyInstruction()
+                                {
+                                    IsCode = true,
+                                    Instruction = value,
+                                    OrdinalIndex = instructionIndex++,
+                                    Arguments = Array.Empty<InstructionArg>()
+                                };
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
         private bool GetReferencedAddressToMethodName(out ulong refAddress, out uint codeSize, out string name, Instruction instruction, ClrRuntime runtime)
         {
             name = null;

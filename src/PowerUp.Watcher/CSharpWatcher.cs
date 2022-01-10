@@ -538,10 +538,28 @@ namespace PowerUp.Watcher
                     var loaded = ctx.LoadFromStream(assemblyStream);
                     List<DecompiledMethod> globalMethodList = new List<DecompiledMethod>();
                     List<TypeLayout> typesMemoryLayouts     = new List<TypeLayout>();
-
                     var compiledType = loaded.GetType(CodeCompiler.BaseClassName);
-                    var decompiledMethods  = compiledType.ToAsm(@private: true);
 
+                    assemblyStream.Position = 0;
+                    pdbStream.Position = 0;
+                    //
+                    // Get IL <-> Code Map.
+                    // @TODO, @NOTE: This map is curently used to just go from X86 <-> C#
+                    // for IL Source Code Map we are using a DebugInfo provider, which does the 
+                    // same thing but it's a part of the ReflectionDisassembler (IL Decompiler) API
+                    // which we do not control.
+                    //
+                    // This creates a bit of a confusion and complicates things so it would be good to just use
+                    // a single map from.
+                    //
+                    using ILToCodeMapProvider codeMap = new ILToCodeMapProvider(unit.SouceCode, pdbStream);
+                    var ilMethodMap = codeMap.GetMap(compiledType);
+                    //
+                    // Get ASM code from the compiled type, and pass in the IL <-> Code map
+                    // We shall use this map to correlate sequence points with IL <-> ASM map
+                    // and produce X86 ASM to Source Code Map.
+                    //
+                    var decompiledMethods = compiledType.ToAsm(sourceCodeMap: ilMethodMap, @private: true);
                     //
                     // @NOTE: For now we are skipping global type layout since
                     // it is kina confusing, hovewer it would be good to have some
@@ -550,8 +568,6 @@ namespace PowerUp.Watcher
 
                     //var typeLayout         = compiledType.ToLayout(@private: true);
                     //typesMemoryLayouts.Add(typeLayout);
-
-
                     //
                     // Get all nested types and decompile them as well.
                     //
@@ -574,7 +590,6 @@ namespace PowerUp.Watcher
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
-
                     //
                     // The code below creates a non collectible context (BAD) in order to be able to support
                     // features like PGO, QuickJIT and other future features that will recompile the method
