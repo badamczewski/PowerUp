@@ -22,7 +22,7 @@ namespace PowerUp.Core.Compilation
 
         public const string BaseClassName = "CompilerGen";
 
-        public string DotNetCoreDirPath { get; private set; }
+        public string DotNetCoreDirPath { get; set; }
         public LanguageVersion LanguageVersion { get; private set; }
 
         public CodeCompiler(string dotNetCoreDirPath, LanguageVersion languageVersion = LanguageVersion.Latest)
@@ -35,24 +35,13 @@ namespace PowerUp.Core.Compilation
         {
             CompilationOptions options = new CompilationOptions();
             var sourceCode = RewriteCode(code, options);
-            
+
             var compilation = CSharpCompilation.Create("assembly_" + DateTime.Now.Ticks.ToString())
             .WithOptions(
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                     .WithOptimizationLevel(OptimizationLevel.Release)
-                    .WithAllowUnsafe(true)
-                    
-            )
-            .AddReferences(
-                MetadataReference.CreateFromFile(typeof(object).GetTypeInfo().Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(System.Console).GetTypeInfo().Assembly.Location),
-                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "mscorlib.dll")),
-                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "netstandard.dll")),
-                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Runtime.dll")),
-                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Linq.dll")),
-                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Linq.Expressions.dll")),
-                MetadataReference.CreateFromFile(Path.Combine(DotNetCoreDirPath, "System.Runtime.CompilerServices.Unsafe.dll"))
-                )
+                    .WithAllowUnsafe(true))
+            .AddReferences(ResolveReferences(DotNetCoreDirPath))
             .AddSyntaxTrees(CSharpSyntaxTree.ParseText(sourceCode, 
             CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion)));
 
@@ -199,6 +188,21 @@ namespace PowerUp.Core.Compilation
                     }}";
 
             return sourceCode;
+        }
+
+        public static PortableExecutableReference[] ResolveReferences(string dotNetCoreDirPath)
+        {
+            return new PortableExecutableReference[]
+            {
+                 MetadataReference.CreateFromFile(typeof(object).GetTypeInfo().Assembly.Location),
+                 MetadataReference.CreateFromFile(typeof(System.Console).GetTypeInfo().Assembly.Location),
+                 MetadataReference.CreateFromFile(Path.Combine(dotNetCoreDirPath, "mscorlib.dll")),
+                 MetadataReference.CreateFromFile(Path.Combine(dotNetCoreDirPath, "netstandard.dll")),
+                 MetadataReference.CreateFromFile(Path.Combine(dotNetCoreDirPath, "System.Runtime.dll")),
+                 MetadataReference.CreateFromFile(Path.Combine(dotNetCoreDirPath, "System.Linq.dll")),
+                 MetadataReference.CreateFromFile(Path.Combine(dotNetCoreDirPath, "System.Linq.Expressions.dll")),
+                 MetadataReference.CreateFromFile(Path.Combine(dotNetCoreDirPath, "System.Runtime.CompilerServices.Unsafe.dll"))
+            };
         }
     }
 }
