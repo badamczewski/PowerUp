@@ -87,6 +87,8 @@ namespace PowerUp.Watcher
             if(Directory.Exists(_compiler.DotNetCoreDirPath) == false)
             {
                 XConsole.WriteLine($"'Cannot find the libs under Path: {_compiler.DotNetCoreDirPath}");
+                XConsole.WriteLine($"Using '{System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory()}'");
+                _compiler.DotNetCoreDirPath = System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory();
             }
 
             //
@@ -194,14 +196,13 @@ namespace PowerUp.Watcher
                                     File.WriteAllText(outILFile, errors);
                                 }
                                 else
-                                {
+                                {                                    
                                     if (unit.DecompiledMethods != null)
                                     {
                                         //
                                         // Hide internal methods that get produced by the IL Compiler and C# Compiler
                                         //
                                         HideInternalDecompiledMethods(unit.DecompiledMethods);
-
                                         asmCode = ToAsmString(unit);
                                     }
                                     // 
@@ -590,6 +591,7 @@ namespace PowerUp.Watcher
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
+
                     //
                     // The code below creates a non collectible context (BAD) in order to be able to support
                     // features like PGO, QuickJIT and other future features that will recompile the method
@@ -683,7 +685,7 @@ namespace PowerUp.Watcher
                         }
                     }
                     ILDecompiler iLDecompiler = new ILDecompiler(assemblyStream, pdbStream);
-                    unit.ILTokens = iLDecompiler.ToIL(compiledType, new ILSourceMapProvider(pdbStream));
+                    unit.ILTokens = iLDecompiler.Decompile(compiledType, new ILSourceMapProvider(pdbStream));
                     unit.DecompiledMethods = globalMethodList.ToArray();
                     unit.TypeLayouts = typesMemoryLayouts.ToArray();
 

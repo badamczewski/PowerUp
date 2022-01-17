@@ -29,7 +29,7 @@ namespace PowerUp.Core.Decompilation
             _assemblyStream = assemblyStream;
             _pdbStream = pdbStream;
         }
-        public ILToken[] ToIL(ILSourceMapProvider sourceMapProvider = null)
+        public ILToken[] Decompile(ILSourceMapProvider sourceMapProvider = null)
         {
             StringBuilder ilBuilder = new StringBuilder();
             TextWriter ilWriter = new StringWriter(ilBuilder);
@@ -53,7 +53,7 @@ namespace PowerUp.Core.Decompilation
             return il.ToArray();
         }
 
-        public ILToken[] ToIL(MethodInfo methodInfo, ILSourceMapProvider sourceMapProvider = null)
+        public ILToken[] Decompile(MethodInfo methodInfo, ILSourceMapProvider sourceMapProvider = null)
         {
             StringBuilder ilBuilder = new StringBuilder();
             TextWriter ilWriter = new StringWriter(ilBuilder);
@@ -77,7 +77,7 @@ namespace PowerUp.Core.Decompilation
             return il.ToArray();
         }
 
-        public ILToken[] ToIL(Type type, ILSourceMapProvider sourceMapProvider = null)
+        public ILToken[] Decompile(Type type, ILSourceMapProvider sourceMapProvider = null)
         {
             StringBuilder ilBuilder = new StringBuilder();
             TextWriter ilWriter = new StringWriter(ilBuilder);
