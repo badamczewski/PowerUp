@@ -36,7 +36,7 @@ namespace PowerUp.Watcher
     {
         private IConfigurationRoot _configuration;
 
-        private CodeCompiler _compiler     = null;
+        private CSharpCodeCompiler _compiler     = null;
         private ILCompiler   _iLCompiler   = new ILCompiler();
 
         private bool _unsafeUseTieredCompilation = false;
@@ -133,15 +133,15 @@ namespace PowerUp.Watcher
         {
             if (Environment.Version.Major == 5)
             {
-                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathNet5"]);
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet5"]);
             }
             else if (Environment.Version.Major == 6)
             {
-                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathNet6"], LanguageVersion.Default);
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet6"], LanguageVersion.Default);
             }
             else
             {
-                _compiler = new CodeCompiler(_configuration["DotNetCoreDirPathDefault"]);
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathDefault"]);
             }
         }
 
@@ -419,7 +419,7 @@ namespace PowerUp.Watcher
                 // Don't show the base type method types.
                 // (This is specific to the C# outputs)
                 //
-                if (method.TypeName == CodeCompiler.BaseClassName) method.TypeName = null;
+                if (method.TypeName == CSharpCodeCompiler.BaseClassName) method.TypeName = null;
                 writer.AppendMethodSignature(builder, method);
 
                 foreach(var inliningCall in inliningCalls)
@@ -539,7 +539,7 @@ namespace PowerUp.Watcher
                     var loaded = ctx.LoadFromStream(assemblyStream);
                     List<DecompiledMethod> globalMethodList = new List<DecompiledMethod>();
                     List<TypeLayout> typesMemoryLayouts     = new List<TypeLayout>();
-                    var compiledType = loaded.GetType(CodeCompiler.BaseClassName);
+                    var compiledType = loaded.GetType(CSharpCodeCompiler.BaseClassName);
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
@@ -614,7 +614,7 @@ namespace PowerUp.Watcher
                         //
                         // For PGO it will also inject the histogram table counter.
                         //
-                        compiledType      = loaded.GetType(CodeCompiler.BaseClassName);
+                        compiledType      = loaded.GetType(CSharpCodeCompiler.BaseClassName);
                         decompiledMethods = compiledType.ToAsm(@private: true);
                         //
                         // @NOTE: This is not optimial at all but for now let's go with this version since it's
@@ -733,7 +733,7 @@ namespace PowerUp.Watcher
             int order = 1;
 
             var compiledLog = loadedAssembly.GetType("_Log");
-            var instance    = loadedAssembly.CreateInstance(CodeCompiler.BaseClassName);
+            var instance    = loadedAssembly.CreateInstance(CSharpCodeCompiler.BaseClassName);
             foreach (var method in methodInfos)
             {
                 if (method.Name.StartsWith("Bench_"))
@@ -766,7 +766,7 @@ namespace PowerUp.Watcher
                     if (typeLayouts != null)
                     {
                         var methodUnderSizeName = method.Name.Split("_")[1];
-                        methodUnderSizeName = $"{CodeCompiler.BaseClassName}+" + methodUnderSizeName;
+                        methodUnderSizeName = $"{CSharpCodeCompiler.BaseClassName}+" + methodUnderSizeName;
                         var size = (int)method.Invoke(instance, null);
 
                         var layout = typeLayouts.FirstOrDefault(x => x.Name == methodUnderSizeName);

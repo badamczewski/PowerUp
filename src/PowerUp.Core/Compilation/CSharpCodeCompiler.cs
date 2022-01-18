@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 
 namespace PowerUp.Core.Compilation
 {
-    public class CodeCompiler
+    public class CSharpCodeCompiler
     {
 
         public const string BaseClassName = "CompilerGen";
@@ -25,7 +25,7 @@ namespace PowerUp.Core.Compilation
         public string DotNetCoreDirPath { get; set; }
         public LanguageVersion LanguageVersion { get; private set; }
 
-        public CodeCompiler(string dotNetCoreDirPath, LanguageVersion languageVersion = LanguageVersion.Latest)
+        public CSharpCodeCompiler(string dotNetCoreDirPath, LanguageVersion languageVersion = LanguageVersion.Latest)
         {
             DotNetCoreDirPath = dotNetCoreDirPath;
             LanguageVersion = languageVersion;
@@ -34,8 +34,7 @@ namespace PowerUp.Core.Compilation
         public CompilationUnit Compile(string code)
         {
             CompilationOptions options = new CompilationOptions();
-            var sourceCode = RewriteCode(code, options);
-
+            var sourceCode  = RewriteCode(code, options);
             var compilation = CSharpCompilation.Create("assembly_" + DateTime.Now.Ticks.ToString())
             .WithOptions(
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
