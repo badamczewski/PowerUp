@@ -116,7 +116,7 @@ namespace PowerUp.Core.Decompilation
         private MetadataReader _metadataReader;
 
         public string Description => "";
-        public string SourceFileName => CodeCompiler.BaseClassName;
+        public string SourceFileName => CSharpCodeCompiler.BaseClassName;
 
         public ILSourceMapProvider(Stream pdbStream)
         {
