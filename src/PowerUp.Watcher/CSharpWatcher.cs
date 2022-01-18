@@ -63,7 +63,7 @@ namespace PowerUp.Watcher
             _unsafeUseTieredCompilation = unsafeUseTieredCompilation;
         }
 
-        private void Initialize(string csharpFile, string outAsmFile, string outILFile)
+        private void Initialize(string csharpFile, string outAsmFile, string outILFile, string outCsFile)
         {
             XConsole.WriteLine("CSharp Watcher Initialize:");
 
@@ -72,6 +72,7 @@ namespace PowerUp.Watcher
             XConsole.WriteLine($"`Input File`: {csharpFile}");
             XConsole.WriteLine($"`ASM   File`: {outAsmFile}");
             XConsole.WriteLine($"`IL    File`: {outILFile}");
+            XConsole.WriteLine($"`CS    File`: {outCsFile}");
 
             if (File.Exists(csharpFile) == false)
                 XConsole.WriteLine("'[WARNING]': Input File doesn't exist");
@@ -81,6 +82,9 @@ namespace PowerUp.Watcher
 
             if (File.Exists(outILFile) == false)
                 XConsole.WriteLine("'[WARNING]': IL File doesn't exist");
+
+            if (File.Exists(outCsFile) == false)
+                XConsole.WriteLine("'[WARNING]': CSharp File doesn't exist");
 
             XConsole.WriteLine($"`Libs  Path`: {_compiler.DotNetCoreDirPath}");
 
@@ -145,9 +149,9 @@ namespace PowerUp.Watcher
             }
         }
 
-        public Task WatchFile(string csharpFile, string outAsmFile, string outILFile)
+        public Task WatchFile(string csharpFile, string outAsmFile = null, string outILFile = null, string outCSFile = null)
         {
-            Initialize(csharpFile, outAsmFile, outILFile);
+            Initialize(csharpFile, outAsmFile, outILFile, outCSFile);
 
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
@@ -175,10 +179,11 @@ namespace PowerUp.Watcher
                                 }
 
                                 lastWrite = fileInfo.LastWriteTime;
-                                lastCode = code;
+                                lastCode  = code;
 
                                 string asmCode = string.Empty;
-                                string ilCode = string.Empty;
+                                string ilCode  = string.Empty;
+                                string csCode  = string.Empty;
 
                                 if (unit.Errors.Length > 0)
                                 {
@@ -189,11 +194,13 @@ namespace PowerUp.Watcher
                                         errorBuilder.AppendLine($"{Environment.NewLine}-----------------------------");
                                     }
 
-                                    XConsole.WriteLine($"Writing Errors to: {outAsmFile}, {outILFile}");
+                                    XConsole.WriteLine($"Writing Errors to: {outAsmFile}, {outILFile}, {outCSFile}");
 
                                     var errors = errorBuilder.ToString();
-                                    File.WriteAllText(outAsmFile, errors);
-                                    File.WriteAllText(outILFile, errors);
+
+                                    WriteIfNotNullOrEmpty(outAsmFile, errors);
+                                    WriteIfNotNullOrEmpty(outILFile,  errors);
+                                    WriteIfNotNullOrEmpty(outCSFile,  errors);
                                 }
                                 else
                                 {                                    
@@ -210,7 +217,11 @@ namespace PowerUp.Watcher
                                     {
                                         ilCode = ToILString(unit);
                                     }
-
+                                    //
+                                    if(unit.OutputSourceCode != null)
+                                    {
+                                        csCode = unit.OutputSourceCode;
+                                    }
                                     //
                                     // Pring Global Messages.
                                     //
@@ -221,22 +232,25 @@ namespace PowerUp.Watcher
                                             string.Join(Environment.NewLine, unit.Messages);
                                     }
 
-                                    XConsole.WriteLine($"Writing Results to: {outAsmFile}, {outILFile}");
+                                    XConsole.WriteLine($"Writing Results to: {outAsmFile}, {outILFile}, {outCSFile}");
 
-                                    File.WriteAllText(outAsmFile, asmCode);
-                                    File.WriteAllText(outILFile, ilCode);
+                                    WriteIfNotNullOrEmpty(outAsmFile, asmCode);
+                                    WriteIfNotNullOrEmpty(outILFile, ilCode);
+                                    WriteIfNotNullOrEmpty(outCSFile, csCode);
                                 }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        XConsole.WriteLine($"Writing Errors to: {outAsmFile}, {outILFile}");
+                        XConsole.WriteLine($"Writing Errors to: {outAsmFile}, {outILFile}, {outCSFile}");
                         //
                         // Report this back to the out files.
                         //
-                        File.WriteAllText(outAsmFile, ex.ToString());
-                        File.WriteAllText(outILFile,  ex.ToString());
+                        var exMessage = ex.ToString();
+                        WriteIfNotNullOrEmpty(outAsmFile, exMessage);
+                        WriteIfNotNullOrEmpty(outILFile,  exMessage);
+                        WriteIfNotNullOrEmpty(outCSFile,  exMessage);
                     }
 
                     await Task.Delay(500);
@@ -245,11 +259,16 @@ namespace PowerUp.Watcher
             return iDontCareAboutThisTask;
         }
 
+        private void WriteIfNotNullOrEmpty(string filePath, string content)
+        {
+            if (string.IsNullOrEmpty(filePath) == false)
+                File.WriteAllText(filePath, content);
+        }
+
         public string ToILString(DecompilationUnit unit)
         {
             return new ILWriter().ToILString(unit);
         }
-
         private string ToLayout(TypeLayout[] typeLayouts)
         {
             int offsetPad = 8;
@@ -504,13 +523,16 @@ namespace PowerUp.Watcher
             // and options as comments.
             //
             var compilation = _compiler.Compile(code);
+            //
+            // Get the streams, note that we have to dispose them thus 'using'
+            //
+            using var assemblyStream = compilation.AssemblyStream;
+            using var pdbStream = compilation.PDBStream;
+
             compilation.Options = WatcherUtils.SetCommandOptions(code, compilation.Options);
             unit.Options = compilation.Options;
-            unit.SouceCode = compilation.SourceCode;
-
+            unit.InputSouceCode   = compilation.SourceCode;
             var compilationResult = compilation.CompilationResult;
-            var assemblyStream = compilation.AssemblyStream;
-            var pdbStream = compilation.PDBStream;
 
             XConsole.WriteLine($"Language Version: `{compilation.LanguageVersion}`");
             //
@@ -534,7 +556,7 @@ namespace PowerUp.Watcher
                     unit.Errors = errors.ToArray();
                 }
                 else
-                {
+                {                    
                     assemblyStream.Position = 0;
                     var loaded = ctx.LoadFromStream(assemblyStream);
                     List<DecompiledMethod> globalMethodList = new List<DecompiledMethod>();
@@ -543,6 +565,7 @@ namespace PowerUp.Watcher
 
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
+
                     //
                     // Get IL <-> Code Map.
                     // @TODO, @NOTE: This map is curently used to just go from X86 <-> C#
@@ -553,8 +576,24 @@ namespace PowerUp.Watcher
                     // This creates a bit of a confusion and complicates things so it would be good to just use
                     // a single map from.
                     //
-                    using ILToCodeMapProvider codeMap = new ILToCodeMapProvider(unit.SouceCode, pdbStream);
-                    var ilMethodMap = codeMap.GetMap(compiledType);
+                    using var codeMap = new ILToCodeMapProvider(unit.InputSouceCode, pdbStream);
+                    var ilMethodMap   = codeMap.GetMap(compiledType);
+
+                    //
+                    // Debug Info Provider will be used by the CS and IL Decompilers to resolve variable
+                    // names, and map sequence points.
+                    //
+                    using var sourceMapProvider = new DebugInfoProvider(pdbStream);
+
+                    //
+                    // Use the CSharp Code Decompiler to go from IL back to C#
+                    // This will allow us to see what kinds of transformations took place in the IL
+                    // code from the C# perspective (things like lowering, morphing, magic code, etc).
+                    //
+                    var decompiler = new CSharpDecompiler(assemblyStream, pdbStream);
+                    var nativeSourceCode  = decompiler.Decompile(compiledType, sourceMapProvider);
+                    unit.OutputSourceCode = nativeSourceCode;
+
                     //
                     // Get ASM code from the compiled type, and pass in the IL <-> Code map
                     // We shall use this map to correlate sequence points with IL <-> ASM map
@@ -685,10 +724,9 @@ namespace PowerUp.Watcher
                         }
                     }
                     ILDecompiler iLDecompiler = new ILDecompiler(assemblyStream, pdbStream);
-                    unit.ILTokens = iLDecompiler.Decompile(compiledType, new ILSourceMapProvider(pdbStream));
+                    unit.ILTokens = iLDecompiler.Decompile(compiledType, sourceMapProvider);
                     unit.DecompiledMethods = globalMethodList.ToArray();
                     unit.TypeLayouts = typesMemoryLayouts.ToArray();
-
                     //
                     // Parse and detect method calls in IL to be able to do inline tracing
                     //

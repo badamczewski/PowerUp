@@ -17,7 +17,7 @@ namespace PowerUp.Watcher
 
         public string ToILString(DecompilationUnit unit)
         {
-            var lines = unit.SouceCode.Split(Environment.NewLine);
+            var lines = unit.InputSouceCode.Split(Environment.NewLine);
 
             StringBuilder builder = new StringBuilder();
             builder.AppendLine();

@@ -23,13 +23,15 @@ namespace PowerUp.Core.Decompilation
         private MemoryStream _assemblyStream;
         private MemoryStream _pdbStream;
         private string indent = "    ";
+        private bool _disposeStreams = false;
 
-        public ILDecompiler(MemoryStream assemblyStream, MemoryStream pdbStream)
+        public ILDecompiler(MemoryStream assemblyStream, MemoryStream pdbStream, bool disposeStreams = false)
         {
             _assemblyStream = assemblyStream;
             _pdbStream = pdbStream;
+            _disposeStreams = disposeStreams;
         }
-        public ILToken[] Decompile(ILSourceMapProvider sourceMapProvider = null)
+        public ILToken[] Decompile(DebugInfoProvider sourceMapProvider = null)
         {
             StringBuilder ilBuilder = new StringBuilder();
             TextWriter ilWriter = new StringWriter(ilBuilder);
@@ -38,7 +40,9 @@ namespace PowerUp.Core.Decompilation
             _pdbStream.Position = 0;
 
             List<ILToken> il = new List<ILToken>();
-            using (PEFile pEFile = new PEFile("", _assemblyStream))
+            var peOptions = _disposeStreams == false ? PEStreamOptions.LeaveOpen : PEStreamOptions.Default;
+
+            using (PEFile pEFile = new PEFile("", _assemblyStream, streamOptions: peOptions))
             { 
                 var output = new ILCollector() { IndentationString = indent };
                 var disassembler = new ReflectionDisassembler(output, CancellationToken.None)
@@ -53,7 +57,7 @@ namespace PowerUp.Core.Decompilation
             return il.ToArray();
         }
 
-        public ILToken[] Decompile(MethodInfo methodInfo, ILSourceMapProvider sourceMapProvider = null)
+        public ILToken[] Decompile(MethodInfo methodInfo, DebugInfoProvider sourceMapProvider = null)
         {
             StringBuilder ilBuilder = new StringBuilder();
             TextWriter ilWriter = new StringWriter(ilBuilder);
@@ -77,7 +81,7 @@ namespace PowerUp.Core.Decompilation
             return il.ToArray();
         }
 
-        public ILToken[] Decompile(Type type, ILSourceMapProvider sourceMapProvider = null)
+        public ILToken[] Decompile(Type type, DebugInfoProvider sourceMapProvider = null)
         {
             StringBuilder ilBuilder = new StringBuilder();
             TextWriter ilWriter = new StringWriter(ilBuilder);
@@ -106,84 +110,6 @@ namespace PowerUp.Core.Decompilation
             using var metadataReaderProvider = MetadataReaderProvider.FromPortablePdbStream(_pdbStream);
             var reader = metadataReaderProvider.GetMetadataReader();
             return MetadataTokens.EntityHandle(info.MetadataToken);
-        }
-    }
-
-    public class ILSourceMapProvider : IDisposable, IDebugInfoProvider
-    {
-        private Stream _pdbStream;
-        private MetadataReaderProvider _metadataReaderProvider;
-        private MetadataReader _metadataReader;
-
-        public string Description => "";
-        public string SourceFileName => CSharpCodeCompiler.BaseClassName;
-
-        public ILSourceMapProvider(Stream pdbStream)
-        {
-            _pdbStream = pdbStream;
-            _pdbStream.Position = 0;
-            _metadataReaderProvider = MetadataReaderProvider.FromPortablePdbStream(_pdbStream);
-            _metadataReader = _metadataReaderProvider.GetMetadataReader();
-        }
-
-        public IList<ICSharpCode.Decompiler.DebugInfo.SequencePoint> GetSequencePoints(MethodDefinitionHandle method)
-        {
-            List<ICSharpCode.Decompiler.DebugInfo.SequencePoint> sequencePoints = new();
-            var info = _metadataReader.GetMethodDebugInformation(method);
-            var points = info.GetSequencePoints();
-           
-            foreach (var point in points)
-            {
-                sequencePoints.Add(new ICSharpCode.Decompiler.DebugInfo.SequencePoint() {
-                    Offset = point.Offset,
-                    StartColumn = point.StartColumn,
-                    StartLine = point.StartLine,
-                    EndColumn = point.EndColumn,    
-                    EndLine = point.EndLine,
-                    DocumentUrl = "",
-                });
-            }
-
-            return sequencePoints;
-        }
-
-        public IList<Variable> GetVariables(MethodDefinitionHandle method)
-        {
-            List<Variable> variables = new List<Variable>();
-            foreach (var scopeHandle in _metadataReader.GetLocalScopes(method))
-            {
-                var scope = _metadataReader.GetLocalScope(scopeHandle);
-                foreach (var variableHandle in scope.GetLocalVariables())
-                {
-                    var local = _metadataReader.GetLocalVariable(variableHandle);
-                    variables.Add(new Variable(local.Index, _metadataReader.GetString(local.Name)));
-                }
-            }
-            return variables;
-        }
-
-        public bool TryGetName(MethodDefinitionHandle method, int index, out string name)
-        {
-            name = null;
-            foreach (var scopeHandle in _metadataReader.GetLocalScopes(method))
-            {
-                var scope = _metadataReader.GetLocalScope(scopeHandle);
-                foreach (var variableHandle in scope.GetLocalVariables())
-                {
-                    var local = _metadataReader.GetLocalVariable(variableHandle);
-                    if (index == local.Index)
-                    {
-                        name = _metadataReader.GetString(local.Name);
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        public void Dispose()
-        {
-            _metadataReaderProvider.Dispose();
         }
     }
 }

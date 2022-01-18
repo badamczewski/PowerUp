@@ -5,8 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PowerUp.Watcher
@@ -29,11 +31,24 @@ namespace PowerUp.Watcher
             {
                 if (command.Name == "cs")
                 {
+                    string input = command.Arguments[0];
+                    string outputAsm = null;
+                    string outputIL  = null;
+                    string outputCS  = null;
+
+                    if(command.Arguments.Count > 1)
+                        outputAsm = command.Arguments[1];
+                    if(command.Arguments.Count > 2)
+                        outputIL = command.Arguments[2];
+                    if(command.Arguments.Count > 3)
+                        outputCS = command.Arguments[3];
+
                     CSharpWatcher w = new CSharpWatcher(configuration, false);
                     _ = w.WatchFile(
-                        command.Arguments[0],
-                        command.Arguments[1],
-                        command.Arguments[2]);
+                        input,
+                        outputAsm,
+                        outputIL,
+                        outputCS);
 
                 }
                 else if (command.Name == "go")
@@ -43,7 +58,7 @@ namespace PowerUp.Watcher
                         command.Arguments[0],
                         command.Arguments[1]);
                 }
-                else if(command.Name == "rs")
+                else if (command.Name == "rs")
                 {
                     RustWatcher goWatcher = new RustWatcher(configuration);
                     _ = goWatcher.WatchFile(
@@ -51,7 +66,6 @@ namespace PowerUp.Watcher
                         command.Arguments[1]);
                 }
             }
-
             //
             // Block the current thread, and let watchers work.
             //

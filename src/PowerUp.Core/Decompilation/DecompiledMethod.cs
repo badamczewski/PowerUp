@@ -9,7 +9,15 @@ namespace PowerUp.Core.Decompilation
 {
     public class DecompilationUnit
     {
-        public string SouceCode { get; set; }
+        /// <summary>
+        /// Source Code that was acquired from IR\IL and "decompiled" back to the target language
+        /// </summary>
+        public string OutputSourceCode { get; set; }
+        /// <summary>
+        /// Source Code that was used for compilation, it can includes code rewrites
+        /// done by the compiler and custom transformations.
+        /// </summary>
+        public string InputSouceCode { get; set; }
         public Error[] Errors { get; set; }  = Array.Empty<Error>();
         public DecompiledMethod[] DecompiledMethods { get; set; }
         public TypeLayout[] TypeLayouts { get; set; }
