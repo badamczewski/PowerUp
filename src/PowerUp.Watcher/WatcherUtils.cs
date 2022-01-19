@@ -139,6 +139,10 @@ namespace PowerUp.Watcher
                 {
                     optionsToSet.ShowSourceMaps = true;
                 }
+                else if (value == "up:simpleNames")
+                {
+                    optionsToSet.SimpleNames = true;
+                }
                 //
                 // This is compiler specific.
                 //

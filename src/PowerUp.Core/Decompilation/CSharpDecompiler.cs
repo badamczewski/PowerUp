@@ -1,4 +1,6 @@
-﻿using ICSharpCode.Decompiler.Metadata;
+﻿using ICSharpCode.Decompiler;
+using ICSharpCode.Decompiler.CSharp.OutputVisitor;
+using ICSharpCode.Decompiler.Metadata;
 using ICSharpCode.Decompiler.TypeSystem;
 using PowerUp.Core.Compilation;
 using System;
@@ -24,12 +26,12 @@ namespace PowerUp.Core.Decompilation
             _disposeStreams = disposeStreams;
         }
 
-        public string Decompile(Type type, DebugInfoProvider sourceMapProvider = null)
+        public string Decompile(Type type, DebugInfoProvider sourceMapProvider = null, CompilationOptions options = null)
         {
             _assemblyStream.Position = 0;
             _pdbStream.Position = 0;
 
-            var settings = new ICSharpCode.Decompiler.DecompilerSettings(ICSharpCode.Decompiler.CSharp.LanguageVersion.CSharp1)
+            var settings = new DecompilerSettings(ICSharpCode.Decompiler.CSharp.LanguageVersion.CSharp1)
             {
                 UseLambdaSyntax = false,
                 Deconstruction = false,
@@ -60,7 +62,94 @@ namespace PowerUp.Core.Decompilation
                 {
                     DebugInfoProvider = sourceMapProvider
                 };
-                return disassembler.DecompileTypeAsString(new FullTypeName(type.FullName));
+
+                var ast = disassembler.DecompileType(new FullTypeName(type.FullName));
+
+                var visitorOptions = FormattingOptionsFactory.CreateAllman();
+                visitorOptions.IndentationString = "    ";
+
+                using (StringWriter writer = new StringWriter())
+                {
+                    var visitor = new CSharpDecompilerVisitor(writer, visitorOptions, options);
+                    visitor.VisitSyntaxTree(ast);
+                    return writer.ToString();
+                }
+            }
+        }
+
+        //
+        // Experimental visitor (rewriter) that has the ability to simplify
+        // names of lambdas and closures.
+        //
+        public class CSharpDecompilerVisitor : CSharpOutputVisitor
+        {
+            private CompilationOptions _options;
+            private string closureDefaultName = "<>c__DisplayClass";
+            private string closureVariableDefaultName = "<>c__DisplayClass";
+            private string closureReplacementName = "Closure";
+            private string closureVariableReplacementName = "lambda";
+            public CSharpDecompilerVisitor(TextWriter textWriter, CSharpFormattingOptions formattingPolicy, CompilationOptions options) : base(textWriter, formattingPolicy)
+            {
+                _options = options;
+            }
+
+            public override void VisitIdentifierExpression(ICSharpCode.Decompiler.CSharp.Syntax.IdentifierExpression identifierExpression)
+            {
+                if (_options != null && _options.SimpleNames)
+                {
+                    if (identifierExpression.Identifier.Contains(closureVariableDefaultName))
+                    {
+                        identifierExpression.Identifier = identifierExpression.Identifier.Replace(closureVariableDefaultName, closureVariableReplacementName);
+                    }
+                }
+                base.VisitIdentifierExpression(identifierExpression);
+            }
+
+            public override void VisitVariableDeclarationStatement(ICSharpCode.Decompiler.CSharp.Syntax.VariableDeclarationStatement variableDeclarationStatement)
+            {
+                if (_options != null && _options.SimpleNames)
+                {
+                    if (variableDeclarationStatement.Type is ICSharpCode.Decompiler.CSharp.Syntax.SimpleType simpleType)
+                    {
+                        if (simpleType.Identifier.Contains(closureDefaultName))
+                        {
+                            simpleType.Identifier = simpleType.Identifier.Replace(closureDefaultName, closureReplacementName);
+                        }
+                    }
+
+                    foreach (var variable in variableDeclarationStatement.Variables)
+                    {
+                        if (variable.Name.Contains(closureDefaultName))
+                        {
+                            variable.Name = variable.Name.Replace(closureVariableDefaultName, closureVariableReplacementName);
+                        }
+                    }
+                }
+
+                base.VisitVariableDeclarationStatement(variableDeclarationStatement);
+            }
+
+            public override void VisitTypeDeclaration(ICSharpCode.Decompiler.CSharp.Syntax.TypeDeclaration typeDeclaration)
+            {
+                if (_options != null && _options.SimpleNames)
+                {
+                    if (typeDeclaration.Name.Contains(closureDefaultName))
+                    {
+                        typeDeclaration.Name = typeDeclaration.Name.Replace(closureDefaultName, closureReplacementName);
+                    }
+                }
+                base.VisitTypeDeclaration(typeDeclaration);
+            }
+            public override void VisitSimpleType(ICSharpCode.Decompiler.CSharp.Syntax.SimpleType simpleType)
+            {
+                if (_options != null && _options.SimpleNames)
+                {
+                    if (simpleType.Identifier.Contains(closureDefaultName))
+                    {
+                        simpleType.Identifier = simpleType.Identifier.Replace(closureDefaultName, closureReplacementName);
+                    }
+                }
+                base.VisitSimpleType(simpleType);
             }
         }
 

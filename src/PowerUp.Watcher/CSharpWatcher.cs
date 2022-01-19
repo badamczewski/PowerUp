@@ -591,7 +591,7 @@ namespace PowerUp.Watcher
                     // code from the C# perspective (things like lowering, morphing, magic code, etc).
                     //
                     var decompiler = new CSharpDecompiler(assemblyStream, pdbStream);
-                    var nativeSourceCode  = decompiler.Decompile(compiledType, sourceMapProvider);
+                    var nativeSourceCode  = decompiler.Decompile(compiledType, sourceMapProvider, unit.Options);
                     unit.OutputSourceCode = nativeSourceCode;
 
                     //
