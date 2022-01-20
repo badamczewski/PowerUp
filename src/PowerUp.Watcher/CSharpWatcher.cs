@@ -614,6 +614,7 @@ namespace PowerUp.Watcher
                     var types = compiledType.GetNestedTypes();
                     foreach (var type in types)
                     {
+                        if (type.IsInterface) continue;
                         var innerMethods = type.ToAsm(@private: true);
                         var nestedLayout = type.ToLayout(@private: true);
 
