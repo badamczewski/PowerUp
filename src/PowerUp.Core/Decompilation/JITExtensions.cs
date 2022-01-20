@@ -21,7 +21,17 @@ namespace PowerUp.Core.Decompilation
                 flags |= BindingFlags.NonPublic;
             }
 
-            if(parameters == null)
+            if (typeInfo.IsInterface)
+            {
+                return new TypeLayout()
+                {
+                    Name = typeInfo.Name,
+                    IsValid = false,
+                    Message = ""
+                };
+            }
+
+            if (parameters == null)
                 parameters = TryGetConstructorParameters(typeInfo);
 
             //
@@ -51,6 +61,7 @@ namespace PowerUp.Core.Decompilation
         private static object[] TryGetConstructorParameters(Type typeInfo)
         {
             object[] values = null;
+
             //
             // Try and get constructor params from an attribute if present.
             // If it's not present there should be a way to guess them with good
@@ -76,23 +87,30 @@ namespace PowerUp.Core.Decompilation
             //
             if (values == null)
             {
-                var constructor = typeInfo.GetConstructors().First();
-                var parameters  = constructor.GetParameters();
-                values = new object[parameters.Length];
-
-                int idx = 0;
-                foreach (var param in parameters)
+                var constructor = typeInfo.GetConstructors().FirstOrDefault();
+                //
+                // There is a possibility that there will be no constructors
+                // a struct is a good example of this.
+                //
+                if (constructor != null)
                 {
-                    if (param.ParameterType.IsValueType)
-                    {
-                        values[idx] = Activator.CreateInstance(param.ParameterType);
-                    }
-                    else
-                    {
-                        values[idx] = null;
-                    }
+                    var parameters = constructor.GetParameters();
+                    values = new object[parameters.Length];
 
-                    idx++;
+                    int idx = 0;
+                    foreach (var param in parameters)
+                    {
+                        if (param.ParameterType.IsValueType)
+                        {
+                            values[idx] = Activator.CreateInstance(param.ParameterType);
+                        }
+                        else
+                        {
+                            values[idx] = null;
+                        }
+
+                        idx++;
+                    }
                 }
 
             }

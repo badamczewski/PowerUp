@@ -331,9 +331,30 @@ namespace PowerUp.Watcher
                         lineBuilder.Append($" # throw");
                     }
                 }
+                else if (instruction.Instruction == "push")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+
+                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+
+                    if (IsHex(lhs))
+                        lhs = HexToDecimal(lhs);
+
+                    lineBuilder.Append($" # stack.push({lhs})");
+                }
+                else if (instruction.Instruction == "pop")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+
+                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+
+                    if (IsHex(lhs))
+                        lhs = HexToDecimal(lhs);
+
+                    lineBuilder.Append($" # {lhs} = stack.pop()");
+                }
                 else if (instruction.Instruction == "add")
                 {
-                    string stackInfo = "";
                     var lhs = instruction.Arguments[0].Value.Trim();
                     var rhs = instruction.Arguments[1].Value.Trim();
 
@@ -344,13 +365,16 @@ namespace PowerUp.Watcher
                         rhs = HexToDecimal(rhs);
 
                     if (lhs == "rsp")
-                        stackInfo = $"stack.pop({rhs})";
-
-                    lineBuilder.Append($" # {lhs} += {rhs} {stackInfo}");
+                    {
+                        lineBuilder.Append($" # stack.pop_times({int.Parse(rhs) / 8})");
+                    }
+                    else
+                    {
+                        lineBuilder.Append($" # {lhs} += {rhs}");
+                    }
                 }
                 else if (instruction.Instruction == "sub")
                 {
-                    string stackInfo = "";
                     var lhs = instruction.Arguments[0].Value.Trim();
                     var rhs = instruction.Arguments[1].Value.Trim();
 
@@ -361,9 +385,13 @@ namespace PowerUp.Watcher
                         rhs = HexToDecimal(rhs);
 
                     if (lhs == "rsp")
-                        stackInfo = $"stack.push({rhs})";
-
-                    lineBuilder.Append($" # {lhs} -= {rhs} {stackInfo}");
+                    {
+                        lineBuilder.Append($" # stack.push_times({int.Parse(rhs) / 8})");
+                    }
+                    else
+                    {
+                        lineBuilder.Append($" # {lhs} -= {rhs}");
+                    }
                 }
                 else if (instruction.Instruction == "xor")
                 {

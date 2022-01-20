@@ -203,7 +203,7 @@ namespace PowerUp.Watcher
                                     WriteIfNotNullOrEmpty(outCSFile,  errors);
                                 }
                                 else
-                                {                                    
+                                {    
                                     if (unit.DecompiledMethods != null)
                                     {
                                         //
@@ -257,6 +257,11 @@ namespace PowerUp.Watcher
                 }  
             });
             return iDontCareAboutThisTask;
+        }
+
+        private void WriteCompilerVersion(StringBuilder content, DecompilationUnit unit)
+        {
+            content.Append($"# C# {unit.OutputLanguageVersion} .NET: {Environment.Version.ToString()} {(_isPGO ? "PGO":"")}");
         }
 
         private void WriteIfNotNullOrEmpty(string filePath, string content)
@@ -412,6 +417,8 @@ namespace PowerUp.Watcher
                 return builder.ToString();
             }
 
+            WriteCompilerVersion(builder, unit);
+
             builder.AppendLine();
 
             if (unit.TypeLayouts != null && unit.TypeLayouts.Any())
@@ -449,6 +456,8 @@ namespace PowerUp.Watcher
                 foreach (var inst in method.Instructions)
                 {
                     lineBuilder.Clear();
+
+                    if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
 
                     lineBuilder.Append("  ");
                     //
@@ -531,7 +540,8 @@ namespace PowerUp.Watcher
 
             compilation.Options = WatcherUtils.SetCommandOptions(code, compilation.Options);
             unit.Options = compilation.Options;
-            unit.InputSouceCode   = compilation.SourceCode;
+            unit.InputSouceCode        = compilation.SourceCode;
+            unit.OutputLanguageVersion = compilation.LanguageVersion;
             var compilationResult = compilation.CompilationResult;
 
             XConsole.WriteLine($"Language Version: `{compilation.LanguageVersion}`");

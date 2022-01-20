@@ -24,6 +24,7 @@ namespace PowerUp.Core.Decompilation
         public ILToken[] ILTokens { get; set; }
         public string[] Messages { get; set; } = Array.Empty<string>();
         public CompilationOptions Options { get; set; }
+        public string OutputLanguageVersion { get; set; }
     }
 
     public enum ILTokenType
