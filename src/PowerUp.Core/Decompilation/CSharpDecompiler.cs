@@ -85,7 +85,7 @@ namespace PowerUp.Core.Decompilation
         {
             private CompilationOptions _options;
             private string closureDefaultName = "<>c__DisplayClass";
-            private string closureVariableDefaultName = "<>c__DisplayClass";
+            private string closureVariableDefaultName = "c__DisplayClass0";
             private string closureReplacementName = "Closure";
             private string closureVariableReplacementName = "lambda";
             public CSharpDecompilerVisitor(TextWriter textWriter, CSharpFormattingOptions formattingPolicy, CompilationOptions options) : base(textWriter, formattingPolicy)
@@ -97,6 +97,11 @@ namespace PowerUp.Core.Decompilation
             {
                 if (_options != null && _options.SimpleNames)
                 {
+                    if(identifierExpression.Identifier.StartsWith("<>"))
+                    {
+                        identifierExpression.Identifier = identifierExpression.Identifier.Replace("<>",String.Empty);
+                    }
+
                     if (identifierExpression.Identifier.Contains(closureVariableDefaultName))
                     {
                         identifierExpression.Identifier = identifierExpression.Identifier.Replace(closureVariableDefaultName, closureVariableReplacementName);
@@ -127,6 +132,11 @@ namespace PowerUp.Core.Decompilation
                 }
 
                 base.VisitVariableDeclarationStatement(variableDeclarationStatement);
+            }
+
+            public override void VisitMethodDeclaration(ICSharpCode.Decompiler.CSharp.Syntax.MethodDeclaration methodDeclaration)
+            {
+                base.VisitMethodDeclaration(methodDeclaration);
             }
 
             public override void VisitTypeDeclaration(ICSharpCode.Decompiler.CSharp.Syntax.TypeDeclaration typeDeclaration)
