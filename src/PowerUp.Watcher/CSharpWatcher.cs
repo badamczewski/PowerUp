@@ -823,13 +823,17 @@ namespace PowerUp.Watcher
                         {
                             var diff = Math.Abs((int)(layout.Size - (ulong)size));
                             layout.Size = (ulong)size;
-                            layout.PaddingSize -= (ulong)diff;
 
-                            var padding = layout.Fields.Last();
-                            if(padding.Type == "Padding")
+                            if (layout.Fields.Any())
                             {
-                                padding.Size -= diff;
-                                if (padding.Size <= 0) layout.Fields[layout.Fields.Length - 1] = null;
+                                layout.PaddingSize -= (ulong)diff;
+
+                                var padding = layout.Fields.Last();
+                                if (padding.Type == "Padding")
+                                {
+                                    padding.Size -= diff;
+                                    if (padding.Size <= 0) layout.Fields[layout.Fields.Length - 1] = null;
+                                }
                             }
                         }
                     }

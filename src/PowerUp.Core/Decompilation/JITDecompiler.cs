@@ -197,8 +197,13 @@ namespace PowerUp.Core.Decompilation
                             // the logic is quite complicated and it's not really* possible to add
                             // the correct tail padding size for all cases.
                             //
-                            AddTailingPadding(type, decompiledType, obj, fieldLayouts);
-                            decompiledType.Fields = fieldLayouts.ToArray();
+                            // Renember that structs can have no fields at all.
+                            //
+                            if (fieldLayouts.Any())
+                            {
+                                AddTailingPadding(type, decompiledType, obj, fieldLayouts);
+                                decompiledType.Fields = fieldLayouts.ToArray();
+                            }
                         }
                     }
 
