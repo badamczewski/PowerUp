@@ -118,9 +118,11 @@ namespace PowerUp.Core.Decompilation
 
     public class AssemblyInstruction
     {
+        public const int MaxGuides = 128;
+
         public int OrdinalIndex { get; set; }
 
-        public int[] GuideBlocks = new int[64];
+        public int[] GuideBlocks = new int[MaxGuides];
         public ulong RefAddress { get; set; }
         public ulong Address { get; set; }
         public string Instruction { get; set; }

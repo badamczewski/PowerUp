@@ -113,6 +113,12 @@ namespace PowerUp.Watcher
             int index = 0;
             int maxJmpSize = -1;
 
+            //
+            // If a function has too many jumps then give up on generation.
+            //
+            if (jumps * 2 >= AssemblyInstruction.MaxGuides)
+                return (0, 0);
+
             var orderedInstructions = method.Instructions.OrderByDescending(x => x.JumpSize).ToArray();
             maxJmpSize = orderedInstructions[0].JumpSize;
 
@@ -144,7 +150,6 @@ namespace PowerUp.Watcher
             // What is our maximum nesting level for this jump.
             //
             var level = 2 * methodJumpCount - nestingIndex;
-
             //
             // Generate starting guides 
             //
