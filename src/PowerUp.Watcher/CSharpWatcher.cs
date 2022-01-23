@@ -427,9 +427,21 @@ namespace PowerUp.Watcher
                 builder.AppendLine();
             }
 
+            //
+            // Collect lines for each method and append them at the end.
+            // This is a two pass system where first pass collects all of
+            // the method lines (instructions), and the second pass is responsible
+            // for appending them to the final method string builder.
+            //
+            // This allows us to implement automatic layouts on certain things like
+            // documentation, and other things in the future.
+            //
+            List<string> methodLines = new List<string>();
             foreach (var method in unit.DecompiledMethods)
             {
                 if (method == null || method.IsVisible == false) continue;
+
+                methodLines.Clear();
 
                 (int jumpSize, int nestingLevel) sizeAndNesting = (-1,-1);
                 sizeAndNesting    = JumpGuideDetector.PopulateGuides(method);
@@ -453,6 +465,7 @@ namespace PowerUp.Watcher
                     builder.AppendLine("  " + XConsole.ConsoleBorderStyle.Bullet + "inlined" + " " + inliningCall);
                 }
 
+                double avgOffset = 0; 
                 foreach (var inst in method.Instructions)
                 {
                     lineBuilder.Clear();
@@ -487,6 +500,61 @@ namespace PowerUp.Watcher
                         idx++;
                     }
 
+                    
+                    avgOffset += lineBuilder.Length;
+                    methodLines.Add(lineBuilder.ToString());
+                }
+                //
+                // Check if ASM Docs are using automatic layouts.
+                //
+                if (unit.Options.ShowASMDocumentation && IsDocumentationAutoLayout(unit.Options.ASMDocumentationOffset))
+                {
+                    //
+                    // ASM Docs:
+                    // 1. Compute Documentation Offset based on trimmed mean.
+                    // 2. Compute mean and remove all lines that are > 2x mean
+                    // 3. Find maximum line offset on the remaining lines.
+                    //
+                    // This is needed for automatic offsets, but we don't really want
+                    // to always render at maximum offset, we need to be smart about outliers
+                    // example:
+                    // 
+                    // MOV A,B                   Doc1
+                    // MOV C,D                   Doc2
+                    // CALL XYZ                  Doc3
+                    // CALL VERY.LONG.NAME.HERE  Doc4
+                    //
+                    // We don't want to move all of the docs to the max here since one instruction is an outlier
+                    // and we might move the docs off-screen, we want to have this:
+                    //
+                    // MOV A,B     Doc1
+                    // MOV C,D     Doc2
+                    // CALL XYZ    Doc3
+                    // CALL VERY.LONG.NAME.HERE  Doc4                    
+                    //
+                    avgOffset /= methodLines.Count;
+                    var maxOffset = ComputeDocumentationOffsetBasedOnTrimmedMean(avgOffset, methodLines);
+                    unit.Options.ASMDocumentationOffset = maxOffset;
+                }
+                //
+                // Make a second pass and append all of the lines to the final
+                // string builder
+                //
+                int lineIdx = 0;
+                foreach (var inst in method.Instructions)
+                {
+                    if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
+
+                    //
+                    // @TODO this is bad design, we should be using the string builder
+                    // all the way without switching to string in between.
+                    //
+                    var line = methodLines[lineIdx];
+                    lineBuilder.Clear();
+                    lineBuilder.Append(line);
+                    //
+                    // Check for documentation.
+                    //
                     if (unit.Options.ShowASMDocumentation)
                     {
                         writer.DocumentationOffset = unit.Options.ASMDocumentationOffset;
@@ -495,11 +563,26 @@ namespace PowerUp.Watcher
 
                     builder.Append(lineBuilder.ToString());
                     builder.AppendLine();
+
+                    lineIdx++;
                 }
             }
 
             return builder.ToString();
         }
+
+        private int ComputeDocumentationOffsetBasedOnTrimmedMean(double avgOffset, List<string> methodLines)
+        {
+            var trim = 2 * avgOffset;
+            int maxOffset = 0;
+            foreach (var line in methodLines)
+            {
+                if (line.Length < trim && line.Length > maxOffset)
+                    maxOffset = line.Length;
+            }
+            return maxOffset;
+        }
+        private bool IsDocumentationAutoLayout(int offset) => offset == 0;
 
         public DecompilationUnit DecompileToIL(string code)
         {

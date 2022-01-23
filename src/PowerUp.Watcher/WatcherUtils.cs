@@ -167,7 +167,14 @@ namespace PowerUp.Watcher
                         var argValue = ParseCommandArgument(tokens, i + 2, "offset");
                         if (argValue != null)
                         {
-                            optionsToSet.ASMDocumentationOffset = int.Parse(argValue);
+                            if (argValue.Equals("auto", StringComparison.OrdinalIgnoreCase))
+                            {
+                                optionsToSet.ASMDocumentationOffset = 0;
+                            }
+                            else
+                            {
+                                optionsToSet.ASMDocumentationOffset = int.Parse(argValue);
+                            }
                         }
                     }
                 }
