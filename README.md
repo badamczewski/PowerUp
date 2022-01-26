@@ -45,7 +45,7 @@ This demo shows the layouts feature:
 
 ![power_up_cs_2](https://user-images.githubusercontent.com/752380/142742770-ee02faca-f1f9-448c-9e70-f635a147f671.gif)
 
-C# supports multiple attributes that can be used to control compilation:
+C# supports multiple attributes and comment-level attributes that can be used to control compilation:
 
 ```
 [Bench]       <- Used on a method to Benchmak source code, the method needs to have no input arguments.
@@ -56,7 +56,15 @@ Print(X)      <- This is a C# function that is used to print values when the cod
 [ShowASMDocs(offset={X}) <- Used on Any to turn on ASM code documentation. The offset argument controls the offset from ASM code where the docs are rendered.
 [ShortAddr]   <- Used on Any to have short address lines in the output ASM code.
 [ShortAddr(by={X})] <- Used on Any to have short address lines in the output ASM code. The additional argument is used to control the cut level. 
+//up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:showGuides       <- Used to enable jump guides in the ASM outputs.
+//up:showASMDocs      <- Used to turn on ASM code documentation.
+//up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
+//up:simpleNames      <- Simplify compiler generated names.
 ```
+
+Due to some limitations with C# attributes certain features will remain exclusively as comment-level attributes.
+
 
 ### GO Decompilation
 
@@ -69,7 +77,8 @@ GO supports multiple comment-level attributes that can be used to control compil
 ```
 //up:showGuides       <- Used to enable jump guides in the ASM outputs.
 //up:showASMDocs      <- Used to turn on ASM code documentation.
-//up:showASMDocs offset = {X} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
+//up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
+//up:showCode         <- Show source code maps, that map assembly instructions to source code.
 ```
 
 ### Rust Dissasembly
@@ -83,7 +92,7 @@ Rust supports multiple comment-level attributes that can be used to control comp
 ```
 //up:showGuides       <- Used to enable jump guides in the ASM outputs.
 //up:showASMDocs      <- Used to turn on ASM code documentation.
-//up:showASMDocs offset = {X} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
+//up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
 //up:optimization level = {X} <- Set the compilation optimization level (-C opt-level)
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
 ```
@@ -105,8 +114,9 @@ https://www.youtube.com/watch?v=EZV_9sCrptc
 To make your outputs look nice in Visual Studio Code or any other editor, you must install an X86 assembly syntax.
 
 I use a modified version of the 13xforever X86 ASM syntax: https://github.com/13xforever/x86-assembly-textmate-bundle
-(I hope to be able to bundle it with this tool)
+This version is bundled with the project and can be found here:
 
+https://github.com/badamczewski/PowerUp/tree/main/external/13xforever.language-x86-64-assembly-3.0.0
 
 Additionally you will need *Cascadia Mono* for nice guides and other features.
 
