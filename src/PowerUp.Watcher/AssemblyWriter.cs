@@ -272,13 +272,53 @@ namespace PowerUp.Watcher
                     var lhs = instruction.Arguments[0].Value.Trim();
                     var rhs = instruction.Arguments[1].Value.Trim();
 
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+                    if (lhs.StartsWith("dword ptr")) { lhs = lhs.Replace("dword ptr", "(32bit)Memory"); }
+                    else if (lhs.StartsWith("word ptr")) { lhs = lhs.Replace("word ptr", "(16bit)Memory"); }
+                    else if (lhs.StartsWith("byte ptr")) { lhs = lhs.Replace("byte ptr", "(8bit)Memory"); }
+                    else if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+
+                    if (rhs.StartsWith("dword ptr")) { rhs = rhs.Replace("dword ptr", "(32bit)Memory"); }
+                    else if (rhs.StartsWith("word ptr")) { rhs = rhs.Replace("word ptr", "(16bit)Memory"); }
+                    else if (rhs.StartsWith("byte ptr")) { rhs = rhs.Replace("byte ptr", "(8bit)Memory"); }
+                    else if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
 
                     if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
                     if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
+                    else if (rhs.StartsWith("r")) 
+                    {
+                        if (rhs.EndsWith("d"))      { rhs = "(32bit)" + rhs; }
+                        else if (rhs.EndsWith("w")) { rhs = "(16bit)" + rhs; }
+                        else if (rhs.EndsWith("b")) { rhs = "(8bit)" + rhs; }
+                    }
 
-                    lineBuilder.Append($" # {lhs} = {rhs}");
+                    lineBuilder.Append($" # {lhs} = {rhs} (sign extend)");
+                }
+                else if(instruction.Instruction == "movzx")
+                {
+                    var lhs = instruction.Arguments[0].Value.Trim();
+                    var rhs = instruction.Arguments[1].Value.Trim();
+
+                    if      (lhs.StartsWith("dword ptr")) { lhs = lhs.Replace("dword ptr", "(32bit)Memory"); }
+                    else if (lhs.StartsWith("word ptr"))  { lhs = lhs.Replace("word ptr", "(16bit)Memory"); }
+                    else if (lhs.StartsWith("byte ptr"))  { lhs = lhs.Replace("byte ptr", "(8bit)Memory"); }
+                    else if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
+
+                    if      (rhs.StartsWith("dword ptr")) { rhs = rhs.Replace("dword ptr", "(32bit)Memory"); }
+                    else if (rhs.StartsWith("word ptr"))  { rhs = rhs.Replace("word ptr", "(16bit)Memory"); }
+                    else if (rhs.StartsWith("byte ptr"))  { rhs = rhs.Replace("byte ptr", "(8bit)Memory"); }
+                    else if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
+
+                    if (lhs.StartsWith("e")) { lhs = "(32bit)" + lhs; }
+                    if (rhs.StartsWith("r"))
+                    {
+                        if (rhs.EndsWith("d")) { rhs = "(32bit)" + rhs; }
+                        else if (rhs.EndsWith("w")) { rhs = "(16bit)" + rhs; }
+                        else if (rhs.EndsWith("b")) { rhs = "(8bit)" + rhs; }
+                    }
+                    else if (rhs.Length == 2) { rhs = "(16bit)" + rhs; }
+
+
+                    lineBuilder.Append($" # {lhs} = {rhs} (zero extend)");
                 }
                 else if (instruction.Instruction == "shl")
                 {
