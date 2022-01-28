@@ -525,11 +525,9 @@ namespace PowerUp.Core.Decompilation
                                     blockValue = code.SourceCodeBlock;
                                     sliceValue = blockValue.Substring(code.StartCol - 1, code.EndCol - code.StartCol);
                                     //
-                                    // Count Leftmost Whitespaces 
+                                    // Trim the code block, we don't want whitespaces in comments.
                                     //
-                                    var trim   = CountLeftmostWhitespaces(blockValue);
                                     var blockTrim = blockValue.Trim();
-
                                     //
                                     // If block value is the same as slice value then
                                     // we cannot underline a piece of the line so lets just
@@ -552,6 +550,20 @@ namespace PowerUp.Core.Decompilation
                                     //
                                     if (blockTrim != sliceValue)                                     
                                     {
+                                        //
+                                        // Count Leftmost Whitespaces, to be able to compute
+                                        // where to put the underline guide (if needed).
+                                        // We do this since the code block will be trimmed.
+                                        //
+                                        var trim = CountLeftmostWhitespaces(blockValue);
+
+                                        //
+                                        // We needed the trim to be able to layout the underline
+                                        // correctly.
+                                        // Since we have trimmed the code block we need to compute
+                                        // the difference between what was trimed and meaningfull code
+                                        // that we need to shift to with the guide.
+                                        //
                                         var underline = sliceValue.Length;
                                         sliceValue    = 
                                             new String(' ', code.StartCol - trim - 1) +
