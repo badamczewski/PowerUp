@@ -413,8 +413,14 @@ namespace PowerUp.Core.Decompilation
                 // correctly to sequence points from the ilToNativeCodeMap.
                 //
                 var codeInstruction = TryGenerateSourceCodeMapForInstruction(handle, instruction.IP, ref instructionIndex, ilToNativeCodeMap);
-                if(codeInstruction != null)
-                    instructions.Add(codeInstruction);
+                if (codeInstruction.codeResult != null)
+                {
+                    instructions.Add(codeInstruction.codeResult);
+
+                    if (codeInstruction.additionalStyle != null)
+                        instructions.Add(codeInstruction.additionalStyle);
+                }
+
 
                 //
                 // Parse Arguments
@@ -491,9 +497,11 @@ namespace PowerUp.Core.Decompilation
             };
         }
 
-        private AssemblyInstruction TryGenerateSourceCodeMapForInstruction(ulong methodHandle, ulong instructionIP, ref int instructionIndex, ILToNativeMap[] ilToNativeCodeMap = null)
+        private (AssemblyInstruction codeResult, AssemblyInstruction additionalStyle) TryGenerateSourceCodeMapForInstruction(ulong methodHandle, ulong instructionIP, ref int instructionIndex, ILToNativeMap[] ilToNativeCodeMap = null)
         {
             AssemblyInstruction result = null;
+            AssemblyInstruction style  = null;
+
             if (ilToNativeCodeMap != null && _codeMap != null)
             {
                 var codeMapEntry = _codeMap
@@ -507,35 +515,88 @@ namespace PowerUp.Core.Decompilation
                     {
                         if (entry.StartAddress == instructionIP)
                         {
-                            var value = entry.ILOffset.ToString();
+                            var blockValue = entry.ILOffset.ToString();
+                            var sliceValue = blockValue;
 
                             foreach (var code in codeMapEntry.CodeMap)
                             {
                                 if (code.Offset == entry.ILOffset)
                                 {
-                                    value = code.SourceCodeBlock;
-                                    codeFound = true;
+                                    blockValue = code.SourceCodeBlock;
+                                    sliceValue = blockValue.Substring(code.StartCol - 1, code.EndCol - code.StartCol);
+                                    //
+                                    // Count Leftmost Whitespaces 
+                                    //
+                                    var trim   = CountLeftmostWhitespaces(blockValue);
+                                    var blockTrim = blockValue.Trim();
+
+                                    //
+                                    // If block value is the same as slice value then
+                                    // we cannot underline a piece of the line so lets just
+                                    // return the block value.
+                                    //
+                                    result =
+                                        new AssemblyInstruction()
+                                        {
+                                            IsCode = true,
+                                            Instruction = blockTrim,
+                                            OrdinalIndex = instructionIndex++,
+                                            Arguments = Array.Empty<InstructionArg>()
+                                        };
+
+                                    //
+                                    // OK, now it gets interesting.
+                                    // Create an underline element:
+                                    // some_code = 0; some_code < 10; some_code++;
+                                    //                ^^^^^^^^^^^^^^
+                                    //
+                                    if (blockTrim != sliceValue)                                     
+                                    {
+                                        var underline = sliceValue.Length;
+                                        sliceValue    = 
+                                            new String(' ', code.StartCol - trim - 1) +
+                                            new String('^', underline);
+
+                                        style =
+                                            new AssemblyInstruction()
+                                            {
+                                                IsCode = true,
+                                                Instruction = sliceValue,
+                                                OrdinalIndex = instructionIndex++,
+                                                Arguments = Array.Empty<InstructionArg>()
+                                            };
+                                    }
+                                    codeFound  = true;
                                     break;
                                 }
                             }
 
                             if (codeFound)
                             {
-                                result = new AssemblyInstruction()
-                                {
-                                    IsCode = true,
-                                    Instruction = value,
-                                    OrdinalIndex = instructionIndex++,
-                                    Arguments = Array.Empty<InstructionArg>()
-                                };
                                 break;
                             }
                         }
                     }
                 }
             }
-            return result;
+            return (result, style);
         }
+
+        private int CountLeftmostWhitespaces(string value)
+        {
+            int trim = 0;
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (char.IsWhiteSpace(value[i]))
+                {
+                    trim++;
+                }
+                else
+                    break;
+            }
+            return trim;
+        }
+
         private bool GetReferencedAddressToMethodName(out ulong refAddress, out uint codeSize, out string name, Instruction instruction, ClrRuntime runtime)
         {
             name = null;

@@ -65,7 +65,7 @@ namespace PowerUp.Core.Decompilation
                         var value = "";
                         for (int lineId = point.StartLine - 1; lineId < point.EndLine; lineId++)
                         {
-                            value += codeLines[lineId].Trim();
+                            value += codeLines[lineId];
                         }
 
                         ILCodeMap entry = new ILCodeMap()
