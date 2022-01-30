@@ -29,6 +29,7 @@ namespace PowerUp.Core.Compilation
         public bool ShowHelp { get; set; }
         public bool ShowGuides { get; set; }
         public bool ShortAddresses { get; set; }
+        public bool RelativeAddresses { get; set; }
         public int AddressesCutByLength { get; set; } = 4;
         public bool ShowASMDocumentation { get; set; }
         public int ASMDocumentationOffset { get; set; } = 45;

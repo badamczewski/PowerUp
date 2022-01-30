@@ -428,6 +428,13 @@ namespace PowerUp.Watcher
             }
 
             //
+            // If the option to cut addresses was selected we should set the cut length
+            // before we write out the address using this writer.
+            //
+            if (unit.Options.ShortAddresses)
+                writer.AddressCutBy = unit.Options.AddressesCutByLength;
+
+            //
             // Collect lines for each method and append them at the end.
             // This is a two pass system where first pass collects all of
             // the method lines (instructions), and the second pass is responsible
@@ -465,12 +472,22 @@ namespace PowerUp.Watcher
                     builder.AppendLine("  " + XConsole.ConsoleBorderStyle.Bullet + "inlined" + " " + inliningCall);
                 }
 
+                var firstInst = method.Instructions.First(x => x.IsCode == false);
+                var baseAddr = firstInst.Address;
+
+
                 double avgOffset = 0; 
                 foreach (var inst in method.Instructions)
                 {
                     lineBuilder.Clear();
 
                     if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
+
+                    if (inst.IsCode == false && unit.Options.RelativeAddresses == true)
+                    {
+                        inst.Address    -= baseAddr;
+                        inst.RefAddress -= baseAddr;
+                    }
 
                     lineBuilder.Append("  ");
                     //
@@ -481,22 +498,16 @@ namespace PowerUp.Watcher
                         writer.AppendGuides(lineBuilder, inst, sizeAndNesting);
                     }
                     //
-                    // If the option to cut addresses was selected we should set the cut length
-                    // before we write out the address using this writer.
-                    //
-                    if (unit.Options.ShortAddresses)
-                        writer.AddressCutBy = unit.Options.AddressesCutByLength;
-                    //
                     // Write out the address as a hex padded string.
                     //
-                    writer.AppendInstructionAddress(lineBuilder, inst, zeroPad: false);
+                    writer.AppendInstructionAddress(lineBuilder, inst, zeroPad: true);
                     writer.AppendInstructionName(lineBuilder, inst);
 
                     int idx = 0;
                     foreach (var arg in inst.Arguments)
                     {
                         var isLast = idx == inst.Arguments.Length - 1;
-                        writer.AppendArgument(lineBuilder, method, inst, arg, isLast, unit.Options);
+                        writer.AppendArgument(lineBuilder, method, inst, arg, isLast);
                         idx++;
                     }
 

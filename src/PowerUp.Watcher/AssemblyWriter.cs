@@ -76,25 +76,33 @@ namespace PowerUp.Watcher
             // Do nothing with code.
             //
             if (inst.IsCode) return;
+            lineBuilder.Append($"{FormatAsAddress(inst.Address, AddressCutBy, AddressPad, zeroPad)}: ");
+        }
 
-            var address   = inst.Address.ToString("X");
-            int cutBy     = AddressCutBy;
+        private string FormatAsAddress(ulong addr, int cutBy, int padBy, bool zeroPad)
+        {
+            var address = addr.ToString("X");
             string hexPad = null;
             if (zeroPad)
             {
                 var hexSize = AddressPad;
-                hexPad = new string('0', hexSize - address.Length);
+                var padLen = hexSize - address.Length;
+                if (padLen < 0) padLen = 0;
+                hexPad = new string('0', padLen);
             }
+
             //
             // The option to shorten addresses was selected but we cannot trim them to len < 0
+            // so leave them as is.
             //
             if (address.Length < cutBy)
-                lineBuilder.Append($"{hexPad} ");
+                return $"{hexPad}{address}";
             else if (cutBy > 0)
-                lineBuilder.Append($"{hexPad}{address.Substring(cutBy)}: ");
+                return $"{hexPad}{address.Substring(cutBy)}";
             else
-                lineBuilder.Append($"{hexPad}{address}: ");
+                return $"{hexPad}{address}";
         }
+
         public void AppendInstructionName(StringBuilder lineBuilder, AssemblyInstruction inst)
         {
             var offset = InstructionPad - inst.Instruction.Length;
@@ -119,7 +127,7 @@ namespace PowerUp.Watcher
             methodBuilder.AppendLine("):");
         }
 
-        public void AppendArgument(StringBuilder lineBuilder, DecompiledMethod method, AssemblyInstruction instruction, InstructionArg arg, bool isLast, Core.Compilation.CompilationOptions options)
+        public void AppendArgument(StringBuilder lineBuilder, DecompiledMethod method, AssemblyInstruction instruction, InstructionArg arg, bool isLast)
         {
             //
             // Check if the instruction was a jump, since jumps need a very special handling,
@@ -147,20 +155,7 @@ namespace PowerUp.Watcher
                 lineBuilder.Append($"{value.Trim()}");
                 if (instruction.RefAddress > 0)
                 {
-                    var addressValue = instruction.RefAddress.ToString("X");
-                    //
-                    // The option to shorten addresses was selected but we cannot trim them to len < 0
-                    //
-                    if (options.ShortAddresses)
-                    {
-                        var cutBy = options.AddressesCutByLength;
-                        if (addressValue.Length < options.AddressesCutByLength)
-                            cutBy = addressValue.Length;
-
-                        lineBuilder.Append($" {addressValue.Substring(options.AddressesCutByLength)}");
-                    }
-                    else
-                        lineBuilder.Append($" {addressValue}");
+                    lineBuilder.Append($" {FormatAsAddress(instruction.RefAddress, AddressCutBy, AddressPad, zeroPad: true)}");
                 }
 
                 //
@@ -258,243 +253,42 @@ namespace PowerUp.Watcher
                 {
                     lineBuilder.Append(' ', lineOffset - lineBuilder.Length);
                 }
-                if (instruction.Instruction == "mov")
+
+                switch (instruction.Instruction)
                 {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
+                    case "mov":   DocumentMOV(lineBuilder, instruction); break;
+                    case "movsxd":DocumentMOVSXD(lineBuilder, instruction); break;
+                    case "movzx": DocumentMOVZX(lineBuilder, instruction); break;
+                    case "shl":   DocumentSHL(lineBuilder, instruction); break;
+                    case "shr":   DocumentSHR(lineBuilder, instruction); break;
+                    case "lea":   DocumentLEA(lineBuilder, instruction); break;
+                    case "inc":   DocumentINC(lineBuilder, instruction); break;
+                    case "dec":   DocumentDEC(lineBuilder, instruction); break;
+                    case "call":  DocumentCALL(lineBuilder, instruction); break;
+                    case "push":  DocumentPUSH(lineBuilder, instruction); break;
+                    case "pop":   DocumentPOP(lineBuilder, instruction); break;
+                    case "add":   DocumentADD(lineBuilder, instruction); break;
+                    case "sub":   DocumentSUB(lineBuilder, instruction); break;
+                    case "xor":   DocumentXOR(lineBuilder, instruction); break;
+                    case "ret":   DocumentRET(lineBuilder, instruction); break;
+                    case "cmp":   DocumentCMP(lineBuilder, instruction, method); break;
+                    case "test":  DocumentTEST(lineBuilder, instruction, method); break;
+                    default:
+                        {
+                            if (instruction.Instruction.StartsWith(".") && instruction.Instruction.EndsWith(":"))
+                            {
+                                lineBuilder.Append($" # jump label");
+                            }
+                            else if (JumpInstructions.Contains(instruction.Instruction))
+                            {
+                                var prev = method.Instructions[instruction.OrdinalIndex - 1];
+                                var guide = prev.Instruction == "cmp" ? XConsole.ConsoleBorderStyle.BottomLeft.ToString() + "> " : "";
+                                var lhs = instruction.RefAddress.ToString("X");
+                                lineBuilder.Append($" # {guide}goto {lhs}");
+                            }
 
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-                    lineBuilder.Append($" # {lhs} = {rhs}");
-                }
-                else if (instruction.Instruction == "movsxd")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("dword ptr")) { lhs = lhs.Replace("dword ptr", "(32bit)Memory"); }
-                    else if (lhs.StartsWith("word ptr")) { lhs = lhs.Replace("word ptr", "(16bit)Memory"); }
-                    else if (lhs.StartsWith("byte ptr")) { lhs = lhs.Replace("byte ptr", "(8bit)Memory"); }
-                    else if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-
-                    if (rhs.StartsWith("dword ptr")) { rhs = rhs.Replace("dword ptr", "(32bit)Memory"); }
-                    else if (rhs.StartsWith("word ptr")) { rhs = rhs.Replace("word ptr", "(16bit)Memory"); }
-                    else if (rhs.StartsWith("byte ptr")) { rhs = rhs.Replace("byte ptr", "(8bit)Memory"); }
-                    else if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
-                    if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
-                    else if (rhs.StartsWith("r")) 
-                    {
-                        if (rhs.EndsWith("d"))      { rhs = "(32bit)" + rhs; }
-                        else if (rhs.EndsWith("w")) { rhs = "(16bit)" + rhs; }
-                        else if (rhs.EndsWith("b")) { rhs = "(8bit)" + rhs; }
-                    }
-
-                    lineBuilder.Append($" # {lhs} = {rhs} (sign extend)");
-                }
-                else if(instruction.Instruction == "movzx")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if      (lhs.StartsWith("dword ptr")) { lhs = lhs.Replace("dword ptr", "(32bit)Memory"); }
-                    else if (lhs.StartsWith("word ptr"))  { lhs = lhs.Replace("word ptr", "(16bit)Memory"); }
-                    else if (lhs.StartsWith("byte ptr"))  { lhs = lhs.Replace("byte ptr", "(8bit)Memory"); }
-                    else if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-
-                    if      (rhs.StartsWith("dword ptr")) { rhs = rhs.Replace("dword ptr", "(32bit)Memory"); }
-                    else if (rhs.StartsWith("word ptr"))  { rhs = rhs.Replace("word ptr", "(16bit)Memory"); }
-                    else if (rhs.StartsWith("byte ptr"))  { rhs = rhs.Replace("byte ptr", "(8bit)Memory"); }
-                    else if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (lhs.StartsWith("e")) { lhs = "(32bit)" + lhs; }
-                    if (rhs.StartsWith("r"))
-                    {
-                        if (rhs.EndsWith("d")) { rhs = "(32bit)" + rhs; }
-                        else if (rhs.EndsWith("w")) { rhs = "(16bit)" + rhs; }
-                        else if (rhs.EndsWith("b")) { rhs = "(8bit)" + rhs; }
-                    }
-                    else if (rhs.Length == 2) { rhs = "(16bit)" + rhs; }
-
-
-                    lineBuilder.Append($" # {lhs} = {rhs} (zero extend)");
-                }
-                else if (instruction.Instruction == "shl")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
-                    if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
-
-                    lineBuilder.Append($" # {lhs} << {rhs}");
-                }
-                else if (instruction.Instruction == "shr")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
-                    if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
-
-                    lineBuilder.Append($" # {lhs} >> {rhs}");
-                }
-                else if (instruction.Instruction == "lea")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = rhs.Replace("[", "").Replace("]", ""); }
-                    lineBuilder.Append($" # {lhs} = {rhs}");
-                }
-                else if (instruction.Instruction == "inc")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    lineBuilder.Append($" # {lhs}++");
-                }
-                else if (instruction.Instruction == "call")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-
-                    if (lhs.StartsWith("CORINFO") && lhs.EndsWith("FAIL"))
-                    {
-                        lineBuilder.Append($" # throw");
-                    }
-                }
-                else if (instruction.Instruction == "push")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-
-                    if (IsHex(lhs))
-                        lhs = HexToDecimal(lhs);
-
-                    lineBuilder.Append($" # stack.push({lhs})");
-                }
-                else if (instruction.Instruction == "pop")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-
-                    if (IsHex(lhs))
-                        lhs = HexToDecimal(lhs);
-
-                    lineBuilder.Append($" # {lhs} = stack.pop()");
-                }
-                else if (instruction.Instruction == "add")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (IsHex(rhs))
-                        rhs = HexToDecimal(rhs);
-
-                    if (lhs == "rsp")
-                    {
-                        lineBuilder.Append($" # stack.pop_times({int.Parse(rhs) / 8})");
-                    }
-                    else
-                    {
-                        lineBuilder.Append($" # {lhs} += {rhs}");
-                    }
-                }
-                else if (instruction.Instruction == "sub")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (IsHex(rhs))
-                        rhs = HexToDecimal(rhs);
-
-                    if (lhs == "rsp")
-                    {
-                        lineBuilder.Append($" # stack.push_times({int.Parse(rhs) / 8})");
-                    }
-                    else
-                    {
-                        lineBuilder.Append($" # {lhs} -= {rhs}");
-                    }
-                }
-                else if (instruction.Instruction == "xor")
-                {
-                    var lhs = instruction.Arguments[0].Value.Trim();
-                    var rhs = instruction.Arguments[1].Value.Trim();
-
-                    if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                    if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                    if (IsHex(rhs))
-                        rhs = HexToDecimal(rhs);
-
-                    if (lhs == rhs)
-                        lineBuilder.Append($" # {lhs} = 0");
-                    else
-                        lineBuilder.Append($" # {lhs} ^= {rhs}");
-                }
-                else if (instruction.Instruction == "ret")
-                {
-                    lineBuilder.Append($" # return;");
-                }
-                else if (instruction.Instruction == "cmp")
-                {
-                    if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
-                    {
-                        string @operator = "NA";
-                        var inst = instruction;
-                        var next = method.Instructions[instruction.OrdinalIndex + 1];
-
-                        var lhs = instruction.Arguments[0].Value.Trim();
-                        var rhs = instruction.Arguments[1].Value.Trim();
-
-                        if (lhs.StartsWith("[")) { lhs = "Memory" + lhs; }
-                        if (rhs.StartsWith("[")) { rhs = "Memory" + rhs; }
-
-                        if (IsHex(rhs))
-                            rhs = HexToDecimal(rhs);
-
-                        @operator = SetOperatorForASMDocs(next);
-                        lineBuilder.Append($" # if({lhs} {@operator} {rhs})");
-                    }
-                }
-                else if (instruction.Instruction == "test")
-                {
-                    if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
-                    {
-                        string @operator = "NA";
-                        var inst = instruction;
-                        var next = method.Instructions[instruction.OrdinalIndex + 1];
-                        @operator = SetOperatorForASMDocs(next);
-                        lineBuilder.Append($" # if({inst.Arguments[0].Value.Trim()} & {inst.Arguments[1].Value} {@operator} 0)");
-                    }
-                }
-                else if (instruction.Instruction.StartsWith(".") && instruction.Instruction.EndsWith(":"))
-                {
-                    lineBuilder.Append($" # jump label");
-                }
-                else if (JumpInstructions.Contains(instruction.Instruction))
-                {
-                    var prev = method.Instructions[instruction.OrdinalIndex - 1];
-                    var guide = prev.Instruction == "cmp" ? XConsole.ConsoleBorderStyle.BottomLeft.ToString() + "> " : "";
-                    var lhs = instruction.RefAddress.ToString("X");
-                    lineBuilder.Append($" # {guide}goto {lhs}");
+                            break;
+                        }
                 }
             }
             catch (Exception ex)
@@ -509,6 +303,257 @@ namespace PowerUp.Watcher
             }
         }
 
+        private void DocumentMOV(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+            lineBuilder.Append($" # {lhs} = {rhs}");
+        }
+
+        private void DocumentTEST(StringBuilder lineBuilder, AssemblyInstruction instruction, DecompiledMethod method)
+        {
+            if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
+            {
+                string @operator = "NA";
+                var inst = instruction;
+                var next = method.Instructions[instruction.OrdinalIndex + 1];
+                @operator = SetOperatorForASMDocs(next);
+                lineBuilder.Append($" # if({inst.Arguments[0].Value.Trim()} & {inst.Arguments[1].Value} {@operator} 0)");
+            }
+        }
+
+        private void DocumentMOVZX(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = instruction.Arguments[0].Value.Trim();
+            var rhs = instruction.Arguments[1].Value.Trim();
+
+            if (lhs.StartsWith("e")) { lhs = "(32bit)" + lhs; }
+            if (rhs.StartsWith("r"))
+            {
+                if (rhs.EndsWith("d")) { rhs = "(32bit)" + rhs; }
+                else if (rhs.EndsWith("w")) { rhs = "(16bit)" + rhs; }
+                else if (rhs.EndsWith("b")) { rhs = "(8bit)" + rhs; }
+            }
+            else if (rhs.Length == 2) { rhs = "(16bit)" + rhs; }
+
+
+            lineBuilder.Append($" # {lhs} = {rhs} (zero extend)");
+        }
+
+        private void DocumentMOVSXD(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+            if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
+            if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
+            else if (rhs.StartsWith("r"))
+            {
+                if (rhs.EndsWith("d")) { rhs = "(32bit)" + rhs; }
+                else if (rhs.EndsWith("w")) { rhs = "(16bit)" + rhs; }
+                else if (rhs.EndsWith("b")) { rhs = "(8bit)" + rhs; }
+            }
+
+            lineBuilder.Append($" # {lhs} = {rhs} (sign extend)");
+        }
+
+        private void DocumentSHR(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+            if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
+            if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
+
+            lineBuilder.Append($" # {lhs} >> {rhs}");
+        }
+
+        private void DocumentSHL(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+            if (lhs.StartsWith("r")) { lhs = "(64bit)" + lhs; }
+            if (rhs.StartsWith("e")) { rhs = "(32bit)" + rhs; }
+
+            lineBuilder.Append($" # {lhs} << {rhs}");
+        }
+
+        private void DocumentLEA(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = instruction.Arguments[1].Value.Trim();
+
+            if (rhs.StartsWith("[")) { rhs = rhs.Replace("[", "").Replace("]", ""); }
+            lineBuilder.Append($" # {lhs} = {rhs}");
+        }
+
+        private void DocumentINC(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+
+            lineBuilder.Append($" # {lhs}++");
+        }
+
+        private void DocumentDEC(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+
+            lineBuilder.Append($" # {lhs}--");
+        }
+
+        private void DocumentCALL(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+
+            if (lhs.StartsWith("CORINFO") && lhs.EndsWith("FAIL"))
+            {
+                lineBuilder.Append($" # throw");
+            }
+        }
+        private void DocumentPUSH(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+
+            lineBuilder.Append($" # stack.push({lhs})");
+        }
+
+        private void DocumentPOP(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+
+            lineBuilder.Append($" # {lhs} = stack.pop()");
+        }
+
+        private void DocumentADD(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+            if (lhs == "rsp")
+            {
+                lineBuilder.Append($" # stack.pop_times({int.Parse(rhs) / 8})");
+            }
+            else
+            {
+                lineBuilder.Append($" # {lhs} += {rhs}");
+            }
+        }
+
+        private void DocumentSUB(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+            if (lhs == "rsp")
+            {
+                lineBuilder.Append($" # stack.push_times({int.Parse(rhs) / 8})");
+            }
+            else
+            {
+                lineBuilder.Append($" # {lhs} -= {rhs}");
+            }
+        }
+
+        private void DocumentXOR(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+            if (lhs == rhs)
+                lineBuilder.Append($" # {lhs} = 0");
+            else
+                lineBuilder.Append($" # {lhs} ^= {rhs}");
+        }
+
+        private void DocumentRET(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            lineBuilder.Append($" # return;");
+        }
+
+        private void DocumentCMP(StringBuilder lineBuilder, AssemblyInstruction instruction, DecompiledMethod method)
+        {
+            if (instruction.OrdinalIndex + 1 < method.Instructions.Count)
+            {
+                string @operator = "NA";
+                var inst = instruction;
+                var next = method.Instructions[instruction.OrdinalIndex + 1];
+
+                var lhs = FormatArgument(instruction.Arguments[0].Value);
+                var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+                @operator = SetOperatorForASMDocs(next);
+                lineBuilder.Append($" # if({lhs} {@operator} {rhs})");
+            }
+        }
+
+        private string FormatArgument(string arg)
+        {
+            var lhs = arg.Trim();
+            var indexerTypeValue = "";
+
+            bool isMemory = false;
+            if (lhs.StartsWith("dword ptr"))
+            {
+                isMemory = true;
+                indexerTypeValue = "(32bit)Memory";
+            }
+            else if (lhs.StartsWith("word ptr"))
+            {
+                isMemory = true;
+                indexerTypeValue = "(16bit)Memory";
+            }
+            else if (lhs.StartsWith("byte ptr"))
+            {
+                isMemory = true;
+                indexerTypeValue = "(8bit)Memory";
+            }
+            else if (lhs.StartsWith("["))
+            {
+                isMemory = true;
+                indexerTypeValue = "Memory";
+            }
+
+            //
+            // Parse each individual term in the indexer
+            //
+            if (isMemory)
+            {
+                StringBuilder indexerValueBuilder = new StringBuilder();
+                var startFrom = lhs.IndexOf('[');
+                var endTo     = lhs.IndexOf("]");
+                var value = "";
+                for(int i = startFrom + 1; i < endTo + 1; i++)
+                {
+                    var c = lhs[i];
+                    //
+                    // Operator
+                    //
+                    if(c == '+' || c == '-' || c == '*' || c == ']')
+                    {
+                        var argValue = FormatArgument(value);
+                        value = "";
+
+                        indexerValueBuilder.Append(argValue);
+                        if (c != ']')
+                            indexerValueBuilder.Append(c);
+                    }
+                    else
+                    {
+                        value += c;
+                    }
+                }
+
+                lhs = $"{indexerTypeValue}[{indexerValueBuilder.ToString()}]";
+            }
+
+            if (IsHex(lhs))
+                lhs = HexToDecimal(lhs);
+
+            return lhs;
+        }
+
         private bool IsHex(string value)
         {
             if (value != null)
@@ -520,7 +565,7 @@ namespace PowerUp.Watcher
         private string HexToDecimal(string value)
         {
             var hexEssence = value.Substring(0, value.Length - 1);
-            int decValue = Convert.ToInt32(hexEssence, 16);
+            var decValue = Convert.ToInt64(hexEssence, 16);
             return decValue.ToString();
         }
         private string SetOperatorForASMDocs(AssemblyInstruction instruction)

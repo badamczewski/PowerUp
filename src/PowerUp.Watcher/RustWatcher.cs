@@ -186,7 +186,7 @@ namespace PowerUp.Watcher
                     foreach (var arg in inst.Arguments)
                     {
                         var isLast = idx == inst.Arguments.Length - 1;
-                        writer.AppendArgument(lineBuilder, method, inst, arg, isLast, unit.Options);
+                        writer.AppendArgument(lineBuilder, method, inst, arg, isLast);
                         idx++;
                     }
 

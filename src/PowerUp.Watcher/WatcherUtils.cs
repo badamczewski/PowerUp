@@ -143,6 +143,10 @@ namespace PowerUp.Watcher
                 {
                     optionsToSet.SimpleNames = true;
                 }
+                else if (value == "up:relativeAddr")
+                {
+                    optionsToSet.RelativeAddresses = true;
+                }
                 //
                 // This is compiler specific.
                 //
