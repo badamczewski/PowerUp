@@ -140,7 +140,6 @@ namespace PowerUp.Core.Decompilation
         {
             if (typeInfo.IsEnum)
                 return Array.Empty<DecompiledMethod>();
-
             List<DecompiledMethod> methods = new List<DecompiledMethod>();
 
             foreach (var constructorInfo in typeInfo.GetConstructors())
@@ -156,6 +155,8 @@ namespace PowerUp.Core.Decompilation
 
             foreach (var methodInfo in typeInfo.GetMethods(flags))
             {
+                if (methodInfo.IsAbstract) continue;
+
                 if (methodInfo.DeclaringType != typeof(System.Object) && 
                     methodInfo.DeclaringType != typeof(System.ValueType))
                 {

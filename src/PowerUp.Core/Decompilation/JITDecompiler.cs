@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 using System.IO;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using Microsoft.Diagnostics.Runtime.DacInterface;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -320,18 +321,19 @@ namespace PowerUp.Core.Decompilation
         {
             var handleValue = (ulong)method.MethodHandle.Value.ToInt64();
             ulong codePtr = 0;
-            uint  codeSize = 0;
+            uint codeSize = 0;
             ILToNativeMap[] iLToNativeMaps = null;
-            //
-            // For generic methods we need a different way of finding out the generic type implementation
-            // that JIT has created.
-            //
-            // @NOTE: I don't know how to do it any other way than using SOS lib and getting
-            // the data out this way. We should not rely on SOS long term since it is worth while
-            // to learn how the data is laid out in the VM.
-            //
-            if (method.IsGenericMethod)
+       
+            var clrmdMethodHandle = runtime.GetMethodByHandle(handleValue);
+            if (clrmdMethodHandle.NativeCode == 0) throw new InvalidOperationException($"Unable to disassemble method `{method}`");
+
+            codePtr  = clrmdMethodHandle.HotColdInfo.HotStart;
+            codeSize = clrmdMethodHandle.HotColdInfo.HotSize;
+
+            if (clrmdMethodHandle.NativeCode == ulong.MaxValue)
             {
+                //
+                // Method wasn't found using simple handle lookup.
                 //
                 // Get the SOS interface and try to extract all of the needed information by using 
                 // Method Desc (MD) and extracting the Method Table (MT), this will allow us the extract
@@ -339,30 +341,80 @@ namespace PowerUp.Core.Decompilation
                 //
                 // @TODO / @NOTE: In theory this could be better since now we have access to tireded 
                 // metadata, which should be somewhere in the code header (JITType field)
-                //
+                //                  
                 var sos = runtime.DacLibrary.SOSDacInterface;
-
-                if (sos.GetMethodDescData(handleValue, 0, out var data))
+                if (sos.GetMethodDescData(handleValue, 0, out var descData))
                 {
-                    var slot = sos.GetMethodTableSlot(data.MethodTable, data.SlotNumber);
-                    if (sos.GetCodeHeaderData(data.NativeCodeAddr, out var code))
+                    //
+                    // Get Code Address and Size on the header data using native code address.
+                    //
+                    var codeData = GetCodeHeaderDataUsingSlot(sos, descData.NativeCodeAddr);
+
+                    codePtr = codeData.ptr;
+                    codeSize = codeData.size;
+
+                    if (codeData.size == 0)
                     {
-                        codePtr = code.MethodStart;
-                        codeSize = code.HotRegionSize;
+                        //
+                        // Still nothing? This might mean that we are dealing with a virtual/abstract type
+                        // that needs a table lookup, and this is when it gets interesting.
+                        // Such types have duplicated methods in it's method table and this might be that case
+                        // so we have to look up other methds in the MT and find ours.
+                        //
+                        if (sos.GetMethodTableData(descData.MethodTable, out var mtData))
+                        {
+                            for (var i = 0; i < mtData.NumMethods; i++)
+                            {
+                                //
+                                // We already know that this is not compiled.
+                                //
+                                if (i == descData.SlotNumber)
+                                    continue;
+
+                                codeData = GetCodeHeaderData(sos, i, ref descData);
+
+                                if (codeData.size != 0)
+                                {
+                                    codePtr = codeData.ptr;
+                                    codeSize = codeData.size;
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
-            else
+            //
+            // At this point we should have a valid code address so we should be able to get the
+            // IL Source Maps
+            //
+            if (codePtr != 0)
             {
-                var clrmdMethodHandle = runtime.GetMethodByHandle(handleValue);
-                if (clrmdMethodHandle.NativeCode == 0) throw new InvalidOperationException($"Unable to disassemble method `{method}`");
-
-                codePtr = clrmdMethodHandle.HotColdInfo.HotStart;
-                codeSize = clrmdMethodHandle.HotColdInfo.HotSize;
+                clrmdMethodHandle = runtime.GetMethodByAddress(codePtr);
                 iLToNativeMaps = clrmdMethodHandle.ILOffsetMap;
             }
 
             return (handleValue, codePtr, codeSize, iLToNativeMaps);
+        }
+
+        private (ulong ptr, uint size) GetCodeHeaderDataUsingSlot(SOSDac sos, ulong slot)
+        {
+            ulong codePtr = 0;
+            uint codeSize = 0;
+
+            if (sos.GetCodeHeaderData(slot, out var code))
+            {
+                codePtr = code.MethodStart;
+                codeSize = code.HotRegionSize;
+            }
+
+            return (codePtr, codeSize);
+        }
+
+        private (ulong ptr, uint size) GetCodeHeaderData(SOSDac sos, int slotNum, ref MethodDescData descData)
+        {
+            var slot = sos.GetMethodTableSlot(descData.MethodTable, slotNum);
+            return GetCodeHeaderDataUsingSlot(sos, slot);
         }
 
         public unsafe DecompiledMethod DecompileMethod(ulong codePtr, uint codeSize, string name)
