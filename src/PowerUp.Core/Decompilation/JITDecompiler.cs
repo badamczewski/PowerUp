@@ -12,6 +12,7 @@ using System.IO;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using Microsoft.Diagnostics.Runtime.DacInterface;
+using System.Collections.Immutable;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -44,9 +45,7 @@ namespace PowerUp.Core.Decompilation
         //
         public unsafe TypeLayout GetTypeLayoutFromHeap(Type type, object instance)
         {
-            using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id,
-                UInt32.MaxValue,
-                AttachFlag.Passive))
+            using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id, false))
             {
                 var clrVersion = dataTarget.ClrVersions.First();
                 var runtime = clrVersion.CreateRuntime();
@@ -57,7 +56,7 @@ namespace PowerUp.Core.Decompilation
                 // @NOTE: Not sure if this is needed any longer but it doesn't matter for us here.
                 // Link: https://github.com/microsoft/clrmd/issues/303
                 //
-                dataTarget.DataReader.Flush();
+                dataTarget.DataReader.FlushCachedData();
                 //
                 // @SIZE_OF_STRUCTS:
                 //
@@ -110,11 +109,11 @@ namespace PowerUp.Core.Decompilation
 
                             decompiledType = new TypeLayout();
                             decompiledType.Name    = obj.Type.Name;
-                            decompiledType.Fields  = new FieldLayout[obj.Type.Fields.Count];
-                            decompiledType.IsBoxed = obj.IsBoxed;
+                            decompiledType.Fields  = new FieldLayout[obj.Type.Fields.Length];
+                            decompiledType.IsBoxed = obj.IsBoxedValue;
                             decompiledType.Size    = obj.Size;
 
-                            var isClass = (type.IsValueType && obj.IsBoxed) == false;
+                            var isClass = (type.IsValueType && obj.IsBoxedValue) == false;
                             int fieldIndex = 0;
                             int baseOffset = 0;
                             //
@@ -159,7 +158,7 @@ namespace PowerUp.Core.Decompilation
                                     Size = size
                                 });
 
-                                if (fieldIndex + 1 < obj.Type.Fields.Count)
+                                if (fieldIndex + 1 < obj.Type.Fields.Length)
                                 {
                                     var next = obj.Type.Fields[fieldIndex + 1];
                                     //
@@ -218,7 +217,7 @@ namespace PowerUp.Core.Decompilation
             var last = fieldLayouts.Last();
             var nextOffset = last.Offset + last.Size;
 
-            if (type.IsValueType && obj.IsBoxed)
+            if (type.IsValueType && obj.IsBoxedValue)
             {
                 if (obj.Type.Fields.Any() == false)
                     decompiledType.Size = 1;
@@ -276,11 +275,9 @@ namespace PowerUp.Core.Decompilation
             }
         }
 
-        public DecompiledMethod DecompileMethod(MethodInfo method, string functionCallName = null)
+        public DecompiledMethod DecompileMethod(MethodInfo method)
         {
-            using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id,
-                UInt32.MaxValue,
-                AttachFlag.Passive))
+            using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id, false))
             {
                 var clrVersion = dataTarget.ClrVersions.First();
                 var runtime = clrVersion.CreateRuntime();
@@ -290,26 +287,25 @@ namespace PowerUp.Core.Decompilation
                 // @NOTE: Not sure if this is needed any longer but it doesn't matter for us here.
                 // Link: https://github.com/microsoft/clrmd/issues/303
                 //
-                dataTarget.DataReader.Flush();
+                dataTarget.DataReader.FlushCachedData();
 
                 var topLevelDelegateAddress = GetMethodAddress(runtime, method);
 
-                var decompiledMethod = DecompileMethod(runtime, 
+                var decompiledMethod = DecompileMethod(runtime,
                     topLevelDelegateAddress.codePointer,
                     topLevelDelegateAddress.codeSize,
-                    topLevelDelegateAddress.handle,
-                    topLevelDelegateAddress.ilToNativeCodeMap, 
-                    functionCallName);
+                    topLevelDelegateAddress.ilToNativeCodeMap,
+                    topLevelDelegateAddress.handle);
 
                 var @params = method.GetParameters();
-                
+
                 decompiledMethod.Name = method.Name;
-                decompiledMethod.TypeName  = method.DeclaringType.Name;
-                decompiledMethod.Return    = method.ReturnType.Name;
+                decompiledMethod.TypeName = method.DeclaringType.Name;
+                decompiledMethod.Return = method.ReturnType.Name;
                 decompiledMethod.Arguments = new string[@params.Length];
 
                 int idx = 0;
-                foreach(var parameter in @params)
+                foreach (var parameter in @params)
                 {
                     decompiledMethod.Arguments[idx++] = parameter.ParameterType.Name;
                 }
@@ -317,12 +313,12 @@ namespace PowerUp.Core.Decompilation
             }
         }
 
-        public unsafe (ulong handle, ulong codePointer, uint codeSize, ILToNativeMap[] ilToNativeCodeMap) GetMethodAddress(ClrRuntime runtime, MethodInfo method)
+        public unsafe (ulong handle, ulong codePointer, uint codeSize, ImmutableArray<ILToNativeMap> ilToNativeCodeMap) GetMethodAddress(ClrRuntime runtime, MethodInfo method)
         {
             var handleValue = (ulong)method.MethodHandle.Value.ToInt64();
             ulong codePtr = 0;
             uint codeSize = 0;
-            ILToNativeMap[] iLToNativeMaps = null;
+            ImmutableArray<ILToNativeMap> iLToNativeMaps = ImmutableArray<ILToNativeMap>.Empty;
        
             var clrmdMethodHandle = runtime.GetMethodByHandle(handleValue);
             if (clrmdMethodHandle.NativeCode == 0) throw new InvalidOperationException($"Unable to disassemble method `{method}`");
@@ -363,7 +359,7 @@ namespace PowerUp.Core.Decompilation
                         //
                         if (sos.GetMethodTableData(descData.MethodTable, out var mtData))
                         {
-                            for (var i = 0; i < mtData.NumMethods; i++)
+                            for (var i = 0u; i < mtData.NumMethods; i++)
                             {
                                 //
                                 // We already know that this is not compiled.
@@ -390,7 +386,7 @@ namespace PowerUp.Core.Decompilation
             //
             if (codePtr != 0)
             {
-                clrmdMethodHandle = runtime.GetMethodByAddress(codePtr);
+                clrmdMethodHandle = runtime.GetMethodByInstructionPointer(codePtr);
                 iLToNativeMaps = clrmdMethodHandle.ILOffsetMap;
             }
 
@@ -411,17 +407,15 @@ namespace PowerUp.Core.Decompilation
             return (codePtr, codeSize);
         }
 
-        private (ulong ptr, uint size) GetCodeHeaderData(SOSDac sos, int slotNum, ref MethodDescData descData)
+        private (ulong ptr, uint size) GetCodeHeaderData(SOSDac sos, uint slotNum, ref MethodDescData descData)
         {
             var slot = sos.GetMethodTableSlot(descData.MethodTable, slotNum);
             return GetCodeHeaderDataUsingSlot(sos, slot);
         }
 
-        public unsafe DecompiledMethod DecompileMethod(ulong codePtr, uint codeSize, string name)
+        public unsafe DecompiledMethod DecompileMethod(ulong codePtr, uint codeSize)
         {
-            using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id,
-                UInt32.MaxValue,
-                AttachFlag.Passive))
+            using (var dataTarget = DataTarget.AttachToProcess(Process.GetCurrentProcess().Id, false))
             {
                 var clrVersion = dataTarget.ClrVersions.First();
                 var runtime = clrVersion.CreateRuntime();
@@ -432,12 +426,12 @@ namespace PowerUp.Core.Decompilation
                 // @NOTE: Not sure if this is needed any longer but it doesn't matter for us here.
                 // Link: https://github.com/microsoft/clrmd/issues/303
                 //
-                dataTarget.DataReader.Flush();
-                return DecompileMethod(runtime, codePtr, codeSize, 0, null, name);
+                dataTarget.DataReader.FlushCachedData();
+                return DecompileMethod(runtime, codePtr, codeSize, ImmutableArray<ILToNativeMap>.Empty, 0);
             }
         }
 
-        public unsafe DecompiledMethod DecompileMethod(ClrRuntime runtime, ulong codePtr, uint codeSize, ulong handle = 0, ILToNativeMap[] ilToNativeCodeMap = null, string functionCallName = null)
+        public unsafe DecompiledMethod DecompileMethod(ClrRuntime runtime, ulong codePtr, uint codeSize, ImmutableArray<ILToNativeMap> ilToNativeCodeMap, ulong handle = 0)
         {
             List<AssemblyInstruction> instructions = new List<AssemblyInstruction>();
 
@@ -497,11 +491,6 @@ namespace PowerUp.Core.Decompilation
                         out address, out size, out name,
                         instruction, runtime);
 
-                    if (functionCallName != null && functionCallName == name)
-                    {
-                        return DecompileMethod(runtime, address, size);
-                    }
-
                     assemblyInstruction.Arguments = new InstructionArg[args.Length];
                     for (int i = 0; i < args.Length; i++)
                     {
@@ -549,7 +538,7 @@ namespace PowerUp.Core.Decompilation
             };
         }
 
-        private (AssemblyInstruction codeResult, AssemblyInstruction additionalStyle) TryGenerateSourceCodeMapForInstruction(ulong methodHandle, ulong instructionIP, ref int instructionIndex, ILToNativeMap[] ilToNativeCodeMap = null)
+        private (AssemblyInstruction codeResult, AssemblyInstruction additionalStyle) TryGenerateSourceCodeMapForInstruction(ulong methodHandle, ulong instructionIP, ref int instructionIndex, ImmutableArray<ILToNativeMap> ilToNativeCodeMap)
         {
             AssemblyInstruction result = null;
             AssemblyInstruction style  = null;
@@ -714,12 +703,12 @@ namespace PowerUp.Core.Decompilation
                 return true;
             }
 
-            var methodTableName = runtime.GetMethodTableName(refAddress);
-            if (string.IsNullOrWhiteSpace(methodTableName) == false)
-            {
-                name = methodTableName;
-                return true;
-            }
+            //var methodTableName = runtime.GetMethodTableName(refAddress);
+            //if (string.IsNullOrWhiteSpace(methodTableName) == false)
+            //{
+            //    name = methodTableName;
+            //    return true;
+            //}
 
             var methodDescriptor = runtime.GetMethodByHandle(refAddress);
             if (methodDescriptor != null)
@@ -730,7 +719,7 @@ namespace PowerUp.Core.Decompilation
                 return true;
             }
 
-            var methodCall = runtime.GetMethodByAddress(refAddress);
+            var methodCall = runtime.GetMethodByInstructionPointer(refAddress);
             if (methodCall != null && string.IsNullOrWhiteSpace(methodCall.Name) == false)
             {
                 name = methodCall.ToString();
@@ -739,20 +728,20 @@ namespace PowerUp.Core.Decompilation
                 return true;
             }
 
-            if (methodCall == null)
-            {
-                if (runtime.ReadPointer(refAddress, out ulong newAddress) && newAddress > ushort.MaxValue)
-                    methodCall = runtime.GetMethodByAddress(newAddress);
+            //if (methodCall == null)
+            //{
+            //    if (runtime.ReadPointer(refAddress, out ulong newAddress) && newAddress > ushort.MaxValue)
+            //        methodCall = runtime.GetMethodByInstructionPointer(newAddress);
 
-                if (methodCall is null)
-                    return false;
+            //    if (methodCall is null)
+            //        return false;
 
-                name = methodCall.ToString();
-                refAddress = methodCall.HotColdInfo.HotStart;
-                codeSize = methodCall.HotColdInfo.HotSize;
+            //    name = methodCall.ToString();
+            //    refAddress = methodCall.HotColdInfo.HotStart;
+            //    codeSize = methodCall.HotColdInfo.HotSize;
 
-                return true;
-            }
+            //    return true;
+            //}
 
             return false;
         }

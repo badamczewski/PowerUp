@@ -22,4 +22,8 @@
     <ProjectReference Include="..\PowerUp.Core\PowerUp.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Tests\" />
+  </ItemGroup>
+
 </Project>

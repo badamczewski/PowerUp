@@ -248,8 +248,7 @@ namespace PowerUp.Core.Decompilation
                 var decompiledAfter = decompiler.
                     DecompileMethod(
                         decompiled.CodeAddress,
-                        decompiled.CodeSize,
-                        methodInfo.Name);
+                        decompiled.CodeSize);
 
                 if (decompiledAfter.CodeAddress != decompiled.CodeAddress)
                 {
