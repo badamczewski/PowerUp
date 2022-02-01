@@ -138,8 +138,6 @@ namespace PowerUp.Core.Decompilation
 
         public static DecompiledMethod[] ToAsm(this Type typeInfo, ILMethodMap[] sourceCodeMap = null, bool @private = false)
         {
-            if (typeInfo.IsEnum)
-                return Array.Empty<DecompiledMethod>();
             List<DecompiledMethod> methods = new List<DecompiledMethod>();
 
             foreach (var constructorInfo in typeInfo.GetConstructors())

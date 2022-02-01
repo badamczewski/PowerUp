@@ -719,6 +719,8 @@ namespace PowerUp.Watcher
                     foreach (var type in types)
                     {
                         if (type.IsInterface) continue;
+                        if (type.IsEnum)      continue;
+
                         var innerMethods = type.ToAsm(@private: true);
                         var nestedLayout = type.ToLayout(@private: true);
 
