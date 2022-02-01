@@ -33,17 +33,39 @@ namespace PowerUp.Watcher
                 {
                     string input = command.Arguments[0];
                     string outputAsm = null;
-                    string outputIL  = null;
-                    string outputCS  = null;
+                    string outputIL = null;
+                    string outputCS = null;
 
-                    if(command.Arguments.Count > 1)
+                    if (command.Arguments.Count > 1)
                         outputAsm = command.Arguments[1];
-                    if(command.Arguments.Count > 2)
+                    if (command.Arguments.Count > 2)
                         outputIL = command.Arguments[2];
-                    if(command.Arguments.Count > 3)
+                    if (command.Arguments.Count > 3)
                         outputCS = command.Arguments[3];
 
                     CSharpWatcher w = new CSharpWatcher(configuration, false);
+                    _ = w.WatchFile(
+                        input,
+                        outputAsm,
+                        outputIL,
+                        outputCS);
+
+                }
+                else if (command.Name == "fs")
+                {
+                    string input = command.Arguments[0];
+                    string outputAsm = null;
+                    string outputIL = null;
+                    string outputCS = null;
+
+                    if (command.Arguments.Count > 1)
+                        outputAsm = command.Arguments[1];
+                    if (command.Arguments.Count > 2)
+                        outputIL = command.Arguments[2];
+                    if (command.Arguments.Count > 3)
+                        outputCS = command.Arguments[3];
+
+                    FSharpWatcher w = new FSharpWatcher(configuration, false);
                     _ = w.WatchFile(
                         input,
                         outputAsm,

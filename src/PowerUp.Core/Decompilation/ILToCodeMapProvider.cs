@@ -48,37 +48,49 @@ namespace PowerUp.Core.Decompilation
                     ILMethodMap methodMap = new ILMethodMap();
                     methodMap.MethodHandle = (ulong)method.MethodHandle.Value.ToInt64();
 
-                    var points = GetSequencePoints(method);
-                    foreach (var point in points)
+                    try
+                    {
+                        var points = GetSequencePoints(method);
+                        foreach (var point in points)
+                        {
+                            //
+                            // Hidden Sequence points have wonky values 
+                            // that make no sense for us.
+                            //
+                            if (point.IsHidden) continue;
+
+                            //
+                            // Get the correct source code block.
+                            //
+                            var startLine = codeLines[point.StartLine - 1];
+                            var endLine = codeLines[point.EndLine - 1];
+                            var value = "";
+                            for (int lineId = point.StartLine - 1; lineId < point.EndLine; lineId++)
+                            {
+                                value += codeLines[lineId];
+                            }
+
+                            ILCodeMap entry = new ILCodeMap()
+                            {
+                                Offset = point.Offset,
+                                StartLine = point.StartLine,
+                                EndLine = point.EndLine,
+                                StartCol = point.StartColumn,
+                                EndCol = point.EndColumn,
+                                SourceCodeBlock = value
+                            };
+
+                            methodMap.CodeMap.Add(entry);
+                        }
+                    }
+                    catch
                     {
                         //
-                        // Hidden Sequence points have wonky values 
-                        // that make no sense for us.
+                        // Quick JIT Methods have sequence points that are out of bounds
+                        // which will create problems with decompilation.
+                        // Do Nothing.
+                        // @TODO: Collect this information and log it to console in watcher.
                         //
-                        if (point.IsHidden) continue;
-
-                        //
-                        // Get the correct source code block.
-                        //
-                        var startLine = codeLines[point.StartLine - 1];
-                        var endLine   = codeLines[point.EndLine - 1];
-                        var value = "";
-                        for (int lineId = point.StartLine - 1; lineId < point.EndLine; lineId++)
-                        {
-                            value += codeLines[lineId];
-                        }
-
-                        ILCodeMap entry = new ILCodeMap()
-                        {
-                            Offset = point.Offset,
-                            StartLine = point.StartLine,
-                            EndLine = point.EndLine,
-                            StartCol = point.StartColumn,
-                            EndCol = point.EndColumn,
-                            SourceCodeBlock = value
-                        };
-
-                        methodMap.CodeMap.Add(entry);
                     }
                     methodMaps.Add(methodMap);
                 }

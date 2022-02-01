@@ -66,7 +66,9 @@ namespace PowerUp.Core.Decompilation
             _pdbStream.Position = 0;
 
             List<ILToken> il = new List<ILToken>();
-            using (PEFile pEFile = new PEFile("", _assemblyStream))
+            var peOptions = _disposeStreams == false ? PEStreamOptions.LeaveOpen : PEStreamOptions.Default;
+
+            using (PEFile pEFile = new PEFile("", _assemblyStream, streamOptions: peOptions))
             {
                 var output = new ILCollector() { IndentationString = indent };
                 var disassembler = new ReflectionDisassembler(output, CancellationToken.None)
@@ -90,7 +92,9 @@ namespace PowerUp.Core.Decompilation
             _pdbStream.Position = 0;
 
             List<ILToken> il = new List<ILToken>();
-            using (PEFile pEFile = new PEFile("", _assemblyStream))
+            var peOptions = _disposeStreams == false ? PEStreamOptions.LeaveOpen : PEStreamOptions.Default;
+
+            using (PEFile pEFile = new PEFile("", _assemblyStream, streamOptions: peOptions))
             {
                 var output = new ILCollector() { IndentationString = indent };
                 var disassembler = new ReflectionDisassembler(output, CancellationToken.None)
@@ -107,7 +111,9 @@ namespace PowerUp.Core.Decompilation
 
         private EntityHandle GetHandle(MemberInfo info)
         {
-            using var metadataReaderProvider = MetadataReaderProvider.FromPortablePdbStream(_pdbStream);
+            var peOptions = _disposeStreams == false ? MetadataStreamOptions.LeaveOpen : MetadataStreamOptions.Default;
+
+            using var metadataReaderProvider = MetadataReaderProvider.FromPortablePdbStream(_pdbStream, peOptions);
             var reader = metadataReaderProvider.GetMetadataReader();
             return MetadataTokens.EntityHandle(info.MetadataToken);
         }
