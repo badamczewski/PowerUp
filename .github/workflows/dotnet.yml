@@ -23,6 +23,7 @@ jobs:
       run: dotnet build --no-restore -c Release
     - name: CheckForAssemblies
       run: Get-ChildItem -Directory -Recurse -Depth 2
+      working-directory: C:\Users\runneradmin\AppData\Local\Microsoft\dotnet
     - name: CheckForAssemblies2
       run: Get-ChildItem -Directory -Recurse -Depth 2
       working-directory: C:\Program Files\dotnet
