@@ -15,8 +15,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\PowerUp.Core\PowerUp.Core.csproj" />
-    <ProjectReference Include="..\src\PowerUp.Watcher\PowerUp.Watcher.csproj" />
+    <ProjectReference Include="..\PowerUp.Core\PowerUp.Core.csproj" />
+    <ProjectReference Include="..\PowerUp.Watcher\PowerUp.Watcher.csproj" />
   </ItemGroup>
 
   <ItemGroup>
