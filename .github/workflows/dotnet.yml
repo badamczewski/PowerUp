@@ -19,5 +19,18 @@ jobs:
         dotnet-version: 6.0.x
     - name: Restore dependencies
       run: dotnet restore
+    #
+    # Someday I will figure this out, but not today.
+    # - name: check vars
+    #  run: echo "$env:GITHUB_WORKSPACE"
+    # - name: App Settings Variable Substitution
+    #  uses: microsoft/variable-substitution@v1
+    #  with:
+    #    files: '$env:GITHUB_WORKSPACE\src\PowerUp.Tests\appsettings.json'
+    #  env:
+    #    DotNetCoreDirPathNet6: 'C:\Users\runneradmin\AppData\Local\Microsoft\dotnet\shared\Microsoft.NETCore.App\'
+    #    DotNetCoreDirPathDefault: 'C:\Users\runneradmin\AppData\Local\Microsoft\dotnet\shared\Microsoft.NETCore.App\'
     - name: Build
       run: dotnet build --no-restore -c Release
+    - name: Test
+      run: dotnet test
