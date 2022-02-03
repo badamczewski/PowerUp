@@ -133,7 +133,7 @@ namespace PowerUp.Watcher
             XConsole.WriteLine(IsDebug ? "'[DEBUG]'" : "`[RELEASE]`");
         }
 
-        private void InitializeCsharpCompiler()
+        public void InitializeCsharpCompiler()
         {
             if (Environment.Version.Major == 5)
             {

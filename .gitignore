@@ -20,3 +20,4 @@
 /src/PowerUp.Watcher/obj
 /src/PowerUp.Watcher/bin
 /.idea
+/PowerUp.Tests/bin/Debug/net6.0
