@@ -31,6 +31,13 @@ namespace PowerUp.Watcher
             {
                 i = SkipThroughHiddenMethods(unit, i);
 
+                //
+                // There might be some cases where we skip and go out of range
+                // of IL instructions, so we should check if this is not happening and exit.
+                //
+                if (i < unit.ILTokens.Length == false)
+                    break;
+
                 var il = unit.ILTokens[i];
                 if (i + 1 < unit.ILTokens.Length)
                 {
