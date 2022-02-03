@@ -20,11 +20,11 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: check vars
-      run: echo "${GITHUB_WORKSPACE}"
+      run: echo "${{env.GITHUB_WORKSPACE}}"
     - name: App Settings Variable Substitution
       uses: microsoft/variable-substitution@v1
       with:
-        files: '${GITHUB_WORKSPACE}\src\PowerUp.Tests\appsettings.json'
+        files: '${{env.GITHUB_WORKSPACE}}\src\PowerUp.Tests\appsettings.json'
       env:
         DotNetCoreDirPathNet6: 'C:\Users\runneradmin\AppData\Local\Microsoft\dotnet\shared\Microsoft.NETCore.App\'
         DotNetCoreDirPathDefault: 'C:\Users\runneradmin\AppData\Local\Microsoft\dotnet\shared\Microsoft.NETCore.App\'
