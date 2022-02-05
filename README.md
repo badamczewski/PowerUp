@@ -7,7 +7,7 @@
 
 The project features the following utilities and tools:
 
-* Live IDE Watcher (For C#, GO and Rust).
+* Live IDE Watcher (For C#, F#, GO and Rust).
 * .NET JIT Dissasembler.
 * .NET IL Compiler.
 * .NET Console with rich formatting.
@@ -60,10 +60,29 @@ Print(X)      <- This is a C# function that is used to print values when the cod
 //up:showASMDocs      <- Used to turn on ASM code documentation.
 //up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
 //up:simpleNames      <- Simplify compiler generated names.
+//up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:relativeAddr     <- All instruction adresses will start from zero.
 ```
 
 Due to some limitations with C# attributes certain features will remain exclusively as comment-level attributes.
 
+### F# Decompilation and dissasembly
+
+F# curently supports much of the features of the C# Watcher, the only thing that is missing is Running and Benchmarking code.
+
+![obraz](https://user-images.githubusercontent.com/752380/152641753-28490801-e8b1-42d2-aed7-2f050c3d0e1a.png)
+
+F# supports multiple comment-level attributes that can be used to control compilation:
+
+```
+//up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:showGuides       <- Used to enable jump guides in the ASM outputs.
+//up:showASMDocs      <- Used to turn on ASM code documentation.
+//up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
+//up:simpleNames      <- Simplify compiler generated names.
+//up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:relativeAddr     <- All instruction adresses will start from zero.
+```
 
 ### GO Decompilation
 
