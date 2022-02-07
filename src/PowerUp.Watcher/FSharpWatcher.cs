@@ -73,16 +73,16 @@ namespace PowerUp.Watcher
             XConsole.WriteLine($"`FS    File`: {outFsFile}");
 
             if (File.Exists(fsharpFile) == false)
-                XConsole.WriteLine("'[WARNING]': Input File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': Input File doesn''t exist");
 
             if (File.Exists(outAsmFile) == false)
-                XConsole.WriteLine("'[WARNING]': ASM File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': ASM File doesn''t exist");
 
             if (File.Exists(outILFile) == false)
-                XConsole.WriteLine("'[WARNING]': IL File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': IL File doesn''t exist");
 
             if (File.Exists(outFsFile) == false)
-                XConsole.WriteLine("'[WARNING]': FSharp File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': FSharp File doesn''t exist");
 
             _pathToCompiler = _configuration["FSharpCompilerPath"];
 

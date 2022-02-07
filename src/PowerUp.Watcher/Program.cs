@@ -2,12 +2,9 @@
 using PowerUp.Core.Console;
 using PowerUp.Core.Decompilation;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,188 +16,84 @@ namespace PowerUp.Watcher
         {
             XConsole.WriteLine("\r\n=== `PowerUP Watcher` ===\r\n");
 
-            var commands = ParseArguments(args);
-            if (ValidateCommands(commands) == false) return;
+            XConsole.WriteLine($"`>>` {string.Join(" ", args)}\r\n");
 
             var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-            .AddJsonFile("appsettings.json", false)
-            .Build();
+                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+                .AddJsonFile("appsettings.json", false)
+                .Build();
 
-            foreach (var command in commands)
+            ConsoleParser parser = new ConsoleParser();
+            parser.RegisterCommand<CSharpWatcher, CSharpWatcherOptions>("cs",
+                new CSharpWatcher(configuration, false),
+                new CSharpWatcherOptions(),
+                (x, y) => x.WatchFile(y.CSharpInput, y.AsmOutput, y.ILOutput, y.CSharpOutput));
+
+            parser.RegisterCommand<FSharpWatcher, FSharpWatcherOptions>("fs",
+                new FSharpWatcher(configuration, false),
+                new FSharpWatcherOptions(),
+                (x, y) => x.WatchFile(y.FSharpInput, y.AsmOutput, y.ILOutput, y.CSharpOutput));
+
+            parser.RegisterCommand<GOWatcher, GoWatcherOptions>("go",
+                new GOWatcher(configuration),
+                new GoWatcherOptions(),
+                (x, y) => x.WatchFile(y.GOInput, y.AsmOutput));
+
+            parser.RegisterCommand<RustWatcher, RustWatcherOptions>("rs",
+                new RustWatcher(configuration),
+                new RustWatcherOptions(),
+                (x, y) => x.WatchFile(y.GOInput, y.AsmOutput));
+
+            if (parser.Evaluate(args) == false)
             {
-                if (command.Name == "cs")
-                {
-                    string input = command.Arguments[0];
-                    string outputAsm = null;
-                    string outputIL = null;
-                    string outputCS = null;
-
-                    if (command.Arguments.Count > 1)
-                        outputAsm = command.Arguments[1];
-                    if (command.Arguments.Count > 2)
-                        outputIL = command.Arguments[2];
-                    if (command.Arguments.Count > 3)
-                        outputCS = command.Arguments[3];
-
-                    CSharpWatcher w = new CSharpWatcher(configuration, false);
-                    _ = w.WatchFile(
-                        input,
-                        outputAsm,
-                        outputIL,
-                        outputCS);
-
-                }
-                else if (command.Name == "fs")
-                {
-                    string input = command.Arguments[0];
-                    string outputAsm = null;
-                    string outputIL = null;
-                    string outputCS = null;
-
-                    if (command.Arguments.Count > 1)
-                        outputAsm = command.Arguments[1];
-                    if (command.Arguments.Count > 2)
-                        outputIL = command.Arguments[2];
-                    if (command.Arguments.Count > 3)
-                        outputCS = command.Arguments[3];
-
-                    FSharpWatcher w = new FSharpWatcher(configuration, false);
-                    _ = w.WatchFile(
-                        input,
-                        outputAsm,
-                        outputIL,
-                        outputCS);
-
-                }
-                else if (command.Name == "go")
-                {
-                    GOWatcher goWatcher = new GOWatcher(configuration);
-                    _ = goWatcher.WatchFile(
-                        command.Arguments[0],
-                        command.Arguments[1]);
-                }
-                else if (command.Name == "rs")
-                {
-                    RustWatcher goWatcher = new RustWatcher(configuration);
-                    _ = goWatcher.WatchFile(
-                        command.Arguments[0],
-                        command.Arguments[1]);
-                }
+                XConsole.WriteLine("\r\nYou can put multiple commands in a single program run");
+                return;
             }
+
+            ValidateConfiguration(configuration);
             //
             // Block the current thread, and let watchers work.
             //
             Console.ReadLine();
         }
 
-        static bool ValidateCommands(List<Command> commands)
+        static void ValidateConfiguration(IConfigurationRoot configuration)
         {
-            bool isOK = true;
+            XConsole.WriteLine("`App Configuration:`");
 
-            if (commands.Count == 0)
+            foreach(var kv in configuration.GetChildren())
             {
-                XConsole.WriteLine("'No Watcher Arguments provided.'");
-                XConsole.WriteLine("A valid argument has a command like: `-cs`, `-go`, `rs`; followed by a list of arguments.\r\n");
-                XConsole.WriteLine("Example:");
-                XConsole.WriteLine("`-cs` 'C:\\code.cs C:\\out.asm C:\\out.il' `-go` 'C:\\code.go C:\\out.asm'\r\n\r");
-                isOK = false;
-            }
-
-            foreach (var command in commands)
-            {
-                if (command.Name == "cs" && command.Arguments.Count < 3)
-                {
-                    //
-                    // Figure out what's wrong.
-                    //
-                    XConsole.WriteLine("`CSharp Watcher` is Missing Arguments:");
-
-                    if (command.Arguments.Count == 2)
-                        XConsole.WriteLine(" 'arg3' is missing");
-                    else if (command.Arguments.Count == 1)
-                        XConsole.WriteLine("'arg2' and 'arg3' are missing");
-                    else if (command.Arguments.Count == 0)
-                        XConsole.WriteLine("'arg1', 'arg2' and 'arg3' are missing");
-
-                    XConsole.WriteLine("\r\nHelp:");
-                    XConsole.WriteLine(" 'arg1' = Path to C#  file");
-                    XConsole.WriteLine(" 'arg2' = Path to ASM file");
-                    XConsole.WriteLine(" 'arg3' = Path to IL  file");
-                    XConsole.WriteLine("");
-                    isOK = false;
-
-                }
-                else if (command.Name == "go" && command.Arguments.Count < 2)
-                {
-                    //
-                    // Figure out what's wrong.
-                    //
-                    XConsole.WriteLine("`GO Watcher` is Missing Arguments:");
-
-                    if (command.Arguments.Count == 1)
-                        XConsole.WriteLine("'arg1' is missing");
-                    else if (command.Arguments.Count == 0)
-                        XConsole.WriteLine("arg1' and 'arg2' are missing");
-
-                    XConsole.WriteLine("\r\nHelp:");
-                    XConsole.WriteLine(" 'arg1' = Path to GO   file");
-                    XConsole.WriteLine(" 'arg2' = Path to ASM  file");
-                    XConsole.WriteLine("");
-
-                    isOK = false;
-                }
-            }
-            return isOK;
-        }
-
-        static List<Command> ParseArguments(string[] args)
-        {
-            //
-            // Parse Console Arguments:
-            //   
-            // The argument string will be split into multiple commands with their arg lists
-            // The list has unlimited since and we should be able to use the same compiler multiple
-            // times but with different arguments.
-            //
-            // Example: -cs C:\\code.cs C:\\out.asm C:\\out.il -go C:\\code.go C:\\out.asm
-            // 
-            // The output should be a list of Watchers with provided arguments:
-            // 1) CSharpWatcher (code.cs, out.asm, out.il)
-            // 2) GoWatcher     (code.go, out.asm)
-            // 
-            List<Command> commands = new List<Command>();  
-            Command command = null;
-            for(int i = 0; i < args.Length; i++)
-            {
-                var arg = args[i];
+                XConsole.Write($"  `{kv.Key}`");
                 //
-                // Check for command:
+                // If the config key has something to do with path, then check if this actually exists.
                 //
-                if (arg.StartsWith('-'))
+                if (kv.Key.Contains("Path"))
                 {
-                    //
-                    // Read Arguments
-                    //
-                    command = new Command();
-                    command.Name = arg.Substring(1);
-                    commands.Add(command);
+                    var value = kv.Value;
+                    var hasExt = Path.HasExtension(value);
+                    if (kv.Value.EndsWith("\\") || kv.Value.EndsWith("/"))
+                    {
+                        value = value.Substring(0, value.Length - 1);
+                    }
+
+                    if (hasExt == true && File.Exists(value) == false)
+                    {
+                        XConsole.WriteLine($" = '[Invalid or Missing]' Watchers might fail.");
+                    }
+                    else if (hasExt == false && Directory.Exists(value) == false)
+                    {
+                        XConsole.WriteLine($" = '[Invalid or Missing]' Watchers might fail.");
+                    }
+                    else
+                    {
+                        XConsole.WriteLine($" = {kv.Value}");
+                    }
                 }
                 else
                 {
-                    if (command == null)
-                        break;
-
-                    command.Arguments.Add(arg);
+                    XConsole.WriteLine($" = {kv.Value}");
                 }
             }
-            return commands;
         }
-    }
-
-    public class Command
-    {
-        public string Name { get; set; }
-        public List<string> Arguments { get; set; } = new();
     }
 }

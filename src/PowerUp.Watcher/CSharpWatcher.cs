@@ -36,8 +36,8 @@ namespace PowerUp.Watcher
     {
         private IConfigurationRoot _configuration;
 
-        private CSharpCodeCompiler _compiler     = null;
-        private ILCompiler   _iLCompiler   = new ILCompiler();
+        private CSharpCodeCompiler _compiler = null;
+        private ILCompiler _iLCompiler = new ILCompiler();
 
         private bool _unsafeUseTieredCompilation = false;
 
@@ -75,16 +75,16 @@ namespace PowerUp.Watcher
             XConsole.WriteLine($"`CS    File`: {outCsFile}");
 
             if (File.Exists(csharpFile) == false)
-                XConsole.WriteLine("'[WARNING]': Input File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': Input File doesn''t exist");
 
             if (File.Exists(outAsmFile) == false)
-                XConsole.WriteLine("'[WARNING]': ASM File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': ASM File doesn''t exist");
 
             if (File.Exists(outILFile) == false)
-                XConsole.WriteLine("'[WARNING]': IL File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': IL File doesn''t exist");
 
             if (File.Exists(outCsFile) == false)
-                XConsole.WriteLine("'[WARNING]': CSharp File doesn't exist");
+                XConsole.WriteLine("'[WARNING]': Lowered CSharp File doesn''t exist");
 
             XConsole.WriteLine($"`Libs  Path`: {_compiler.DotNetCoreDirPath}");
 
