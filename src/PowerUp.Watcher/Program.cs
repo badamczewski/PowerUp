@@ -14,9 +14,9 @@ namespace PowerUp.Watcher
     {
         static void Main(string[] args)
         {
-            XConsole.WriteLine("\r\n=== `PowerUP Watcher` ===\r\n");
+            PrintTitle();
 
-            XConsole.WriteLine($"`>>` {string.Join(" ", args)}\r\n");
+            XConsole.WriteLine($"`Input >>` {string.Join(" ", args)}\r\n");
 
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
@@ -55,6 +55,23 @@ namespace PowerUp.Watcher
             // Block the current thread, and let watchers work.
             //
             Console.ReadLine();
+        }
+
+        static void PrintTitle()
+        {
+            XConsole.WriteLine(
+                XConsole.ConsoleBorderStyle.TopLeft +
+                new string(XConsole.ConsoleBorderStyle.TopBottom, 21) +
+                XConsole.ConsoleBorderStyle.TopRight
+            );
+
+            XConsole.WriteLine(XConsole.ConsoleBorderStyle.Left + "   `PowerUP Watcher`   " + XConsole.ConsoleBorderStyle.Right);
+
+            XConsole.WriteLine(
+                XConsole.ConsoleBorderStyle.BottomLeft +
+                new string(XConsole.ConsoleBorderStyle.TopBottom, 21) +
+                XConsole.ConsoleBorderStyle.BottomRight
+            );
         }
 
         static void ValidateConfiguration(IConfigurationRoot configuration)
