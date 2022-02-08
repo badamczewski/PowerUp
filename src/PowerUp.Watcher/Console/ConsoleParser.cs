@@ -52,6 +52,8 @@ namespace PowerUp.Watcher
                                 prop.SetValue(cmd.InputValues[1], a);
                                 argFound = true;
                             }
+
+                            index++;
                         }
 
                         if (consoleOption.IsRequired && argFound == false)
@@ -63,7 +65,6 @@ namespace PowerUp.Watcher
                             isValid = false;
                         }
 
-                        index++;
                     }
 
                     if (isValid)

@@ -44,13 +44,17 @@ namespace PowerUp.Watcher
                 new RustWatcherOptions(),
                 (x, y) => x.WatchFile(y.GOInput, y.AsmOutput));
 
-            if (parser.Evaluate(args) == false)
+
+            var isOK = parser.Evaluate(args);
+
+            ValidateConfiguration(configuration);
+
+            if (isOK == false)
             {
                 XConsole.WriteLine("\r\nYou can put multiple commands in a single program run");
                 return;
             }
-
-            ValidateConfiguration(configuration);
+            
             //
             // Block the current thread, and let watchers work.
             //
