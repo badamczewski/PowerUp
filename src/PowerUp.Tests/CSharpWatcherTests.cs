@@ -15,7 +15,43 @@ namespace PowerUp.Tests
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("appsettings.json", false)
                 .Build();
+
+            ValidateAndFixConfiguration(configuration, dotnetVersion: '6');
+
             return configuration;
+        }
+
+        static void ValidateAndFixConfiguration(IConfigurationRoot configuration, char dotnetVersion)
+        {
+            var dotnet = configuration["DotNetCoreDirPathNet" + dotnetVersion];
+            if(Directory.Exists(dotnet) == false)
+            {
+                var lastPathIdx = -1;
+                if (dotnet.EndsWith(Path.DirectorySeparatorChar))
+                {
+                    lastPathIdx = dotnet.LastIndexOf(Path.DirectorySeparatorChar);
+                    dotnet = dotnet.Substring(0, lastPathIdx);
+                }
+                //
+                // Remove last \\ or / and go one up.
+                //
+                lastPathIdx = dotnet.LastIndexOf(Path.DirectorySeparatorChar);
+                dotnet = dotnet.Substring(0, lastPathIdx);
+                dotnet += Path.DirectorySeparatorChar;
+
+                var dirs = Directory.EnumerateDirectories(dotnet);
+                foreach(var dir in dirs)
+                {
+                    var name = Path.GetFileName(dir);
+                    if (name.StartsWith(dotnetVersion))
+                    {
+                        dotnet += name + Path.DirectorySeparatorChar;
+                        configuration["DotNetCoreDirPathNet" + dotnetVersion] = dotnet;
+                        break;
+                    }
+                }
+
+            }
         }
 
         private IConfigurationRoot configuration;
