@@ -42,8 +42,7 @@ namespace PowerUp.Watcher
             parser.RegisterCommand<RustWatcher, RustWatcherOptions>("rs",
                 new RustWatcher(configuration),
                 new RustWatcherOptions(),
-                (x, y) => x.WatchFile(y.GOInput, y.AsmOutput));
-
+                (x, y) => x.WatchFile(y.RustInput, y.AsmOutput));
 
             var isOK = parser.Evaluate(args);
 
@@ -54,7 +53,6 @@ namespace PowerUp.Watcher
                 XConsole.WriteLine("\r\nYou can put multiple commands in a single program run");
                 return;
             }
-            
             //
             // Block the current thread, and let watchers work.
             //
