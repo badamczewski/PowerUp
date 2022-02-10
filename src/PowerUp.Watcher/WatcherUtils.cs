@@ -118,6 +118,10 @@ namespace PowerUp.Watcher
             //
             //     //up:someName arg1 = 10
             // 
+            // There also exists a more complicated command where we use multiple arguments:
+            //
+            //     //up:someName arg1 = "Hello", arg2 = "World"
+            //
             // The main goal of this format was parsing simplicity.
             //
             for (int i = 0; i < tokens.Count; i++)
@@ -148,14 +152,40 @@ namespace PowerUp.Watcher
                     optionsToSet.RelativeAddresses = true;
                 }
                 //
+                // Future
+                //
+                //else if (value == "up:diff")
+                //{
+                //    optionsToSet.Diff = true;
+
+                //    // i + 1 = whitespace; i + 2 = word?
+                //    if (MatchNext(tokens, ref i, "Word"))
+                //    {
+                //        var argValue = ParseCommandArgument(tokens, ref i, "source");
+                //        if (argValue != null)
+                //        {
+                //            optionsToSet.DiffSource = argValue;
+                //        }
+
+                //        if (MatchNext(tokens, ref i, "Separator") && MatchNext(tokens, ref i, "Word"))
+                //        {
+                //            argValue = ParseCommandArgument(tokens, ref i, "target");
+                //            if (argValue != null)
+                //            {
+                //                optionsToSet.DiffTarget = argValue;
+                //            }
+                //        }
+                //    }
+                //}
+                //
                 // This is compiler specific.
                 //
                 else if (value == "up:optimization")
                 {
                     // i + 1 = whitespace; i + 2 = word?
-                    if (i + 2 < tokens.Count)
-                    {
-                        var argValue = ParseCommandArgument(tokens, i + 2, "level");
+                    if (MatchNext(tokens, ref i, "Word"))
+                    { 
+                        var argValue = ParseCommandArgument(tokens, ref i, "level");
                         if (argValue != null)
                         {
                             optionsToSet.OptimizationLevel = int.Parse(argValue);
@@ -166,9 +196,9 @@ namespace PowerUp.Watcher
                 {
                     optionsToSet.ShowASMDocumentation = true;
                     // i + 1 = whitespace; i + 2 = word?
-                    if (i + 2 < tokens.Count)
-                    {
-                        var argValue = ParseCommandArgument(tokens, i + 2, "offset");
+                    if (MatchNext(tokens, ref i, "Word"))
+                    { 
+                        var argValue = ParseCommandArgument(tokens, ref i, "offset");
                         if (argValue != null)
                         {
                             if (argValue.Equals("auto", StringComparison.OrdinalIgnoreCase))
@@ -186,18 +216,49 @@ namespace PowerUp.Watcher
                 {
                     optionsToSet.ShortAddresses = true;
                     // i + 1 = whitespace; i + 2 = word?
-                    if (i + 2 < tokens.Count)
+                    if (MatchNext(tokens, ref i, "Word"))
                     {
-                        var argValue = ParseCommandArgument(tokens, i + 2, "by");
+                        var argValue = ParseCommandArgument(tokens, ref i, "by");
                         if (argValue != null)
                         {
                             optionsToSet.AddressesCutByLength = int.Parse(argValue);
                         }
                     }
+
                 }
             }
 
             return optionsToSet;
+        }
+
+        /// <summary>
+        /// Match next token and if it's a match move the reference index 'i' to that token.
+        /// This method will ignore whitespace tokens.
+        /// </summary>
+        /// <param name="tokens"></param>
+        /// <param name="i"></param>
+        /// <param name="matches"></param>
+        /// <returns></returns>
+        private static bool MatchNext(List<Token> tokens, ref int i, params string[] matches)
+        {
+            int move = 1;
+            //
+            // Ignore Whitespace. We don't need to do it in a loop
+            // since our tokenizer captures repeating sequences so all
+            // whitespaces are captured in a single token.
+            //
+            if (tokens[i + move] is WhitespaceToken)
+                move++;
+
+            if (i + move < tokens.Count)
+            {
+                if (matches.Contains(tokens[i + move].TokenName))
+                {
+                    i += move;
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static CompilationOptions ProcessCommandOptions(string code)
@@ -206,7 +267,7 @@ namespace PowerUp.Watcher
             return SetCommandOptions(code, options);
         }
 
-        private static string ParseCommandArgument(List<Token> tokens, int index, string name)
+        private static string ParseCommandArgument(List<Token> tokens, ref int index, string name)
         {
             var token = tokens[index];
             if (token.GetValue() == name)
