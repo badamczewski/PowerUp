@@ -188,3 +188,20 @@ You can write IL Code as a string and compile it to a type; later, it can be fed
    var asm = type.CompiledType.ToAsm();
    asm.Print();
 ```
+
+## Open Source
+
+This project uses many open source projects, where some changes were applied:
+
+- X86 ASSEMBLY Visual Studio Code Template: https://github.com/13xforever/x86-assembly-textmate-bundle
+
+```
+The template was altered to support custom elements, like jump guides and numerous 'special' keywords and instructions.
+```
+
+- DiffPlex Diff: https://github.com/mmanela/diffplex
+
+```
+The project is pulled into PowerUp source code as is, but WPF, Web and WinForm projects were removed since PowerUp just needs to be able to do diffs without any
+UI Dependencies.
+```
