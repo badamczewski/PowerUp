@@ -135,6 +135,20 @@ namespace PowerUp.Watcher
                 return builder.ToString();
             }
 
+            //
+            // Diff selected methods.
+            //
+            if (unit.Options.Diff)
+            {
+                (var source, var target) = WatcherUtils.FindDiffMethods(unit);
+
+                if (source != null && target != null)
+                {
+                    writer.DocumentationOffset = unit.Options.ASMDocumentationOffset;
+                    writer.AppendDiff(builder, source, target, unit.Options.ShowASMDocumentation);
+                }
+            }
+
             foreach (var method in unit.DecompiledMethods)
             {
                 if (method == null) continue;

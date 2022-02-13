@@ -21,3 +21,7 @@
 /src/PowerUp.Watcher/bin
 /.idea
 /PowerUp.Tests/bin/Debug/net6.0
+/src/DiffPlex/bin
+/src/DiffPlex/obj
+/external/DiffPlex/bin
+/external/DiffPlex/obj

@@ -162,6 +162,20 @@ namespace PowerUp.Watcher
                 return builder.ToString();
             }
 
+            //
+            // Diff selected methods.
+            //
+            if (unit.Options.Diff)
+            {
+                (var source, var target) = WatcherUtils.FindDiffMethods(unit);
+
+                if (source != null && target != null)
+                {
+                    writer.DocumentationOffset = unit.Options.ASMDocumentationOffset;
+                    writer.AppendDiff(builder, source, target, unit.Options.ShowASMDocumentation);
+                }
+            }
+
             foreach (var method in unit.DecompiledMethods)
             {
                 if (method == null) continue;
@@ -444,7 +458,25 @@ namespace PowerUp.Watcher
 
                         index = 0;
                         decompiledMethod = new DecompiledMethod();
-                        decompiledMethod.Name = nameInst.Arguments[0].Value;
+
+                        //
+                        // Clean method name:
+                        // - Remove: "".
+                        // - Remove: (SB)
+                        //
+                        var name = nameInst.Arguments[0].Value;
+                        if(name != null)
+                        {
+                            if (name.StartsWith("\"\"."))
+                                name = name.Substring(3);
+
+                            var parrenIndex = name.IndexOf('(');
+                            if (parrenIndex >= 0)
+                                name = name.Substring(0, parrenIndex);
+                        }
+
+                        decompiledMethod.Name = name;
+
                         decompiledMethod.Arguments = new string[0];
                         methods.Add(decompiledMethod);
                     }

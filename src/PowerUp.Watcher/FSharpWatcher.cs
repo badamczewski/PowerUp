@@ -416,6 +416,20 @@ namespace PowerUp.Watcher
                 writer.AddressCutBy = unit.Options.AddressesCutByLength;
 
             //
+            // Diff selected methods.
+            //
+            if (unit.Options.Diff)
+            {
+                (var source, var target) = WatcherUtils.FindDiffMethods(unit);
+
+                if (source != null && target != null)
+                {
+                    writer.DocumentationOffset = unit.Options.ASMDocumentationOffset;
+                    writer.AppendDiff(builder, source, target, unit.Options.ShowASMDocumentation);
+                }
+            }
+
+            //
             // Collect lines for each method and append them at the end.
             // This is a two pass system where first pass collects all of
             // the method lines (instructions), and the second pass is responsible

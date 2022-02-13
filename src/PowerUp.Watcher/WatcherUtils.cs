@@ -1,5 +1,6 @@
 ﻿using PowerUp.Core.Compilation;
 using PowerUp.Core.Console;
+using PowerUp.Core.Decompilation;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -102,6 +103,33 @@ namespace PowerUp.Watcher
             UpCommand.Create("up:showHelp",     "Used to show help.")
         };
 
+        public static (DecompiledMethod source, DecompiledMethod target) FindDiffMethods(DecompilationUnit unit)
+        {
+            //
+            // Find Methods based on the argument names in the diff command.
+            //
+            DecompiledMethod source = null;
+            DecompiledMethod target = null;
+            foreach (var method in unit.DecompiledMethods)
+            {
+                var name = method.Name;
+
+                if (name == unit.Options.DiffSource)
+                {
+                    source = method;
+                }
+                else if (name == unit.Options.DiffTarget)
+                {
+                    target = method;
+                }
+
+                if (source != null && target != null)
+                    break;
+            }
+
+            return (source, target);
+        }
+
         //
         // @TODO: BA Move this to it's own class once we expose more complex options
         // and parsing.
@@ -154,29 +182,29 @@ namespace PowerUp.Watcher
                 //
                 // Future
                 //
-                //else if (value == "up:diff")
-                //{
-                //    optionsToSet.Diff = true;
+                else if (value == "up:diff")
+                {
+                    optionsToSet.Diff = true;
 
-                //    // i + 1 = whitespace; i + 2 = word?
-                //    if (MatchNext(tokens, ref i, "Word"))
-                //    {
-                //        var argValue = ParseCommandArgument(tokens, ref i, "source");
-                //        if (argValue != null)
-                //        {
-                //            optionsToSet.DiffSource = argValue;
-                //        }
+                    // i + 1 = whitespace; i + 2 = word?
+                    if (MatchNext(tokens, ref i, "Word"))
+                    {
+                        var argValue = ParseCommandArgument(tokens, ref i, "source");
+                        if (argValue != null)
+                        {
+                            optionsToSet.DiffSource = argValue;
+                        }
 
-                //        if (MatchNext(tokens, ref i, "Separator") && MatchNext(tokens, ref i, "Word"))
-                //        {
-                //            argValue = ParseCommandArgument(tokens, ref i, "target");
-                //            if (argValue != null)
-                //            {
-                //                optionsToSet.DiffTarget = argValue;
-                //            }
-                //        }
-                //    }
-                //}
+                        if (MatchNext(tokens, ref i, "Separator") && MatchNext(tokens, ref i, "Word"))
+                        {
+                            argValue = ParseCommandArgument(tokens, ref i, "target");
+                            if (argValue != null)
+                            {
+                                optionsToSet.DiffTarget = argValue;
+                            }
+                        }
+                    }
+                }
                 //
                 // This is compiler specific.
                 //

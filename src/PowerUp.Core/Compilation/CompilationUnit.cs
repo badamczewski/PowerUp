@@ -36,6 +36,9 @@ namespace PowerUp.Core.Compilation
         public bool ShowSourceMaps { get; set; }
         public bool SimpleNames { get; set; }
         public int OptimizationLevel { get; set; }
+        public bool Diff { get; set; }
+        public string DiffSource { get; set; }
+        public string DiffTarget { get; set; }
         public CompilationOptions() { }
     }
 }

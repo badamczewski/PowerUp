@@ -244,6 +244,156 @@ namespace PowerUp.Watcher
             if (sizeAndNesting.nestingLevel > 0 && usedGuides == false)
                 methodBuilder.Append(' ', sizeAndNesting.nestingLevel);
         }
+
+        private string CreateInstructionsForDiff(DecompiledMethod method)
+        {
+            var lineBuilder = new StringBuilder();
+            foreach (var inst in method.Instructions)
+            {
+                if (inst.Instruction == null) continue;
+                if (inst.IsCode) continue;
+
+                AppendInstructionName(lineBuilder, inst);
+
+                int idx = 0;
+                foreach (var arg in inst.Arguments)
+                {
+                    var isLast = idx == inst.Arguments.Length - 1;
+                    AppendArgument(lineBuilder, method, inst, arg, isLast);
+                    idx++;
+                }
+                lineBuilder.AppendLine();
+            }
+            return lineBuilder.ToString().Trim();
+        }
+
+        public void AppendDiff(StringBuilder diffBuilder, DecompiledMethod source, DecompiledMethod target, bool appendDocs = false)
+        {
+            diffBuilder.AppendLine($"# Diff of {source.Name} and {target.Name}");
+            StringBuilder sideBySideBuilder = new StringBuilder();
+            StringBuilder docsBuilder = new StringBuilder();
+
+            var leftText  = CreateInstructionsForDiff(source);
+            var rightText = CreateInstructionsForDiff(target);
+
+            //
+            // Let's use the excelent DiffPlex library that will do a Mayers Diff which is the most user friendly
+            // but it's also based on remove-add semantics, so this diff will not really report block moves which for
+            // ASM Diffs might be important.
+            //
+            // This lib is seriously cool and you should use it; here's the link: https://github.com/mmanela/diffplex
+            // 
+            // @TODO @NOTE: For now let's stick to an unmodified version of DiffPlex should we need something extra we
+            // can add it later.
+            //
+            var df = DiffPlex.DiffBuilder.SideBySideDiffBuilder.Diff(
+                DiffPlex.Differ.Instance, 
+                leftText, rightText, 
+                lineChunker: new DiffPlex.Chunkers.LineChunker());
+
+            int idx = 0;
+            int instId = 0;
+
+            int pad = 35;
+            var emptyInst = new AssemblyInstruction() { Address = 0 };
+            foreach (var left in df.OldText.Lines)
+            {
+                var right = df.NewText.Lines[idx++];
+
+               
+                if (instId < target.Instructions.Count)
+                {
+                    //
+                    // Move until we have a valid instruction.
+                    //
+                    while(instId < target.Instructions.Count && target.Instructions[instId].IsCode)
+                        instId++;
+
+                    if (instId < target.Instructions.Count)
+                        AppendInstructionAddress(sideBySideBuilder, target.Instructions[instId]);
+                }
+                else
+                {
+                    //
+                    // The code was removed from target, let's add fake addresses.
+                    //
+                    AppendInstructionAddress(sideBySideBuilder, emptyInst);
+                }
+
+                
+                if (left.Type == DiffPlex.DiffBuilder.Model.ChangeType.Inserted)
+                {
+                    sideBySideBuilder.Append($" + ");
+                }
+                else if (left.Type == DiffPlex.DiffBuilder.Model.ChangeType.Deleted)
+                {
+                    sideBySideBuilder.Append($" {XConsole.ConsoleBorderStyle.TopBottom} ");
+                }
+                else if (left.Type == DiffPlex.DiffBuilder.Model.ChangeType.Imaginary)
+                {
+                    sideBySideBuilder.Append("   ");
+                }
+                else if (left.Type == DiffPlex.DiffBuilder.Model.ChangeType.Unchanged)
+                {
+                    sideBySideBuilder.Append("   ");
+                }
+                else if (left.Type == DiffPlex.DiffBuilder.Model.ChangeType.Modified)
+                {
+                    sideBySideBuilder.Append($" {XConsole.ConsoleBorderStyle.Bullet} ");
+                }
+
+                sideBySideBuilder.Append(left.Text);
+
+                var leftLen = left.Text == null ? 0 : left.Text.Length;
+                var gap = pad - leftLen;
+                var space = "";
+                if (gap > 0)
+                {
+                    space = new string(' ', gap);
+                }
+
+                sideBySideBuilder.Append(space);
+
+                if (right.Type == DiffPlex.DiffBuilder.Model.ChangeType.Inserted)
+                {
+                    instId++;
+                    sideBySideBuilder.Append($" + ");
+                }
+                else if (right.Type == DiffPlex.DiffBuilder.Model.ChangeType.Deleted)
+                {
+                    sideBySideBuilder.Append($" {XConsole.ConsoleBorderStyle.TopBottom} ");
+                }
+                else if (right.Type == DiffPlex.DiffBuilder.Model.ChangeType.Imaginary)
+                {
+                    sideBySideBuilder.Append("   ");
+                }
+                else if (right.Type == DiffPlex.DiffBuilder.Model.ChangeType.Unchanged)
+                {
+                    instId++;
+                    sideBySideBuilder.Append("   ");
+                }
+                else if (right.Type == DiffPlex.DiffBuilder.Model.ChangeType.Modified)
+                {
+                    instId++;
+                    sideBySideBuilder.Append($" {XConsole.ConsoleBorderStyle.Bullet} ");
+                }
+
+                sideBySideBuilder.Append(right.Text);
+
+                if (appendDocs && left.Type != DiffPlex.DiffBuilder.Model.ChangeType.Deleted)
+                {
+                    if (instId - 1 < target.Instructions.Count)
+                    {
+                        AppendX86Documentation(sideBySideBuilder, target, target.Instructions[instId - 1]);
+                    }
+                }
+
+                diffBuilder.AppendLine(sideBySideBuilder.ToString());
+                sideBySideBuilder.Clear();
+                //idx++;
+            }
+        }
+
         public void AppendX86Documentation(StringBuilder lineBuilder, DecompiledMethod method, AssemblyInstruction instruction)
         {
             try

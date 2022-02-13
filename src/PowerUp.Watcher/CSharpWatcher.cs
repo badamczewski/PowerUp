@@ -427,12 +427,29 @@ namespace PowerUp.Watcher
                 builder.AppendLine();
             }
 
+            var documentationOffset = unit.Options.ASMDocumentationOffset;
+
             //
             // If the option to cut addresses was selected we should set the cut length
             // before we write out the address using this writer.
             //
             if (unit.Options.ShortAddresses)
                 writer.AddressCutBy = unit.Options.AddressesCutByLength;
+
+
+            //
+            // Diff selected methods.
+            //
+            if(unit.Options.Diff)
+            {
+                (var source, var target) = WatcherUtils.FindDiffMethods(unit);
+
+                if (source != null && target != null)
+                {
+                    writer.DocumentationOffset = unit.Options.ASMDocumentationOffset;
+                    writer.AppendDiff(builder, source, target, unit.Options.ShowASMDocumentation);
+                }
+            }
 
             //
             // Collect lines for each method and append them at the end.
@@ -510,7 +527,6 @@ namespace PowerUp.Watcher
                         writer.AppendArgument(lineBuilder, method, inst, arg, isLast);
                         idx++;
                     }
-
                     
                     avgOffset += lineBuilder.Length;
                     methodLines.Add(lineBuilder.ToString());
@@ -518,7 +534,7 @@ namespace PowerUp.Watcher
                 //
                 // Check if ASM Docs are using automatic layouts.
                 //
-                if (unit.Options.ShowASMDocumentation && IsDocumentationAutoLayout(unit.Options.ASMDocumentationOffset))
+                if (unit.Options.ShowASMDocumentation && IsDocumentationAutoLayout(documentationOffset))
                 {
                     //
                     // ASM Docs:

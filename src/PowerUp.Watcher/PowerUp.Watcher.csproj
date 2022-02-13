@@ -20,6 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\external\DiffPlex\DiffPlex.csproj" />
+    <ProjectReference Include="..\DiffPlex\DiffPlex.csproj" />
     <ProjectReference Include="..\PowerUp.Core\PowerUp.Core.csproj" />
   </ItemGroup>
 

@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <Version>1.7.0</Version>
+    <PackageTags>diff</PackageTags>
+    <Description>DiffPlex is a diffing library that allows you to programatically create text diffs. DiffPlex is a fast and tested library.</Description>
+    <PackageReleaseNotes>Fixed diffing of sub-components (like words). Ensures ignoreWhitespace and ignoreCase are honoroed in that case and that the parent reflects modification state of the child.</PackageReleaseNotes>
+  </PropertyGroup>
+</Project>
