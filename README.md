@@ -191,7 +191,13 @@ You can write IL Code as a string and compile it to a type; later, it can be fed
 
 ## Open Source
 
-This project uses many open source projects, where some changes were applied:
+This project uses many open source projects, like:
+
+- ICsharpCodeDecompiler
+- BenchmarkDotNet
+- Microsoft Roslyn Compiler Stack 
+
+Additionally, some of the projects were pulled into PowerUp source code and modified:
 
 - X86 ASSEMBLY Visual Studio Code Template: https://github.com/13xforever/x86-assembly-textmate-bundle
 
