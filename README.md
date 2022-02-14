@@ -62,6 +62,7 @@ Print(X)      <- This is a C# function that is used to print values when the cod
 //up:simpleNames      <- Simplify compiler generated names.
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
 //up:relativeAddr     <- All instruction adresses will start from zero.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 Due to some limitations with C# attributes certain features will remain exclusively as comment-level attributes.
@@ -82,6 +83,7 @@ F# supports multiple comment-level attributes that can be used to control compil
 //up:simpleNames      <- Simplify compiler generated names.
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
 //up:relativeAddr     <- All instruction adresses will start from zero.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 ### GO Decompilation
@@ -97,6 +99,7 @@ GO supports multiple comment-level attributes that can be used to control compil
 //up:showASMDocs      <- Used to turn on ASM code documentation.
 //up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 ### Rust Dissasembly
@@ -113,6 +116,7 @@ Rust supports multiple comment-level attributes that can be used to control comp
 //up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
 //up:optimization level = {X} <- Set the compilation optimization level (-C opt-level)
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 ### .NET IL Compilation
