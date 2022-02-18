@@ -17,12 +17,22 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 6.0.x
-        
+
     - name: Setup Go environment
       uses: actions/setup-go@v2.2.0
       
     - name: Restore dependencies
       run: dotnet restore
+      
+    - name: Check Env
+      run: env
+    
+    - name: Set Env
+      run: echo "$env:XYZ=AAAA"
+      
+    - name: Check Env2
+      run: env
+    
     #
     # Someday I will figure this out, but not today.
     # - name: check vars
