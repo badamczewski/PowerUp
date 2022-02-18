@@ -9,10 +9,10 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace PowerUp.Watcher
-{
+{ 
     class Program
     {
-        static void Main(string[] args)
+        static unsafe void Main(string[] args)
         {
             PrintTitle();
 
@@ -22,6 +22,8 @@ namespace PowerUp.Watcher
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("appsettings.json", false)
                 .Build();
+
+            TryAugmentConfiguration(configuration);
 
             ConsoleParser parser = new ConsoleParser();
             parser.RegisterCommand<CSharpWatcher, CSharpWatcherOptions>("cs",
@@ -74,6 +76,31 @@ namespace PowerUp.Watcher
                 new string(XConsole.ConsoleBorderStyle.TopBottom, 21) +
                 XConsole.ConsoleBorderStyle.BottomRight
             );
+        }
+
+        static void TryAugmentConfiguration(IConfigurationRoot configuration)
+        {
+            foreach (var kv in configuration.GetChildren())
+            {
+                //
+                // Augment all * and try to find correct directories.
+                //
+                if(kv.Value.Contains("*"))
+                {
+                    //
+                    // Get augmented value and reassign it to the configuration section.
+                    //
+                    var value = WatcherUtils.FindDirectoryWithPattern(kv.Value);
+                    //
+                    // When we have a file name instread of a directory, we need to remove the
+                    // last separator that was added.
+                    //
+                    if (kv.Value.EndsWith(".dll")) 
+                        value = value.Substring(0, value.Length - 1);   
+                    
+                    configuration[kv.Key] = value;
+                }
+            }
         }
 
         static void ValidateConfiguration(IConfigurationRoot configuration)

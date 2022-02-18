@@ -1,4 +1,5 @@
-﻿using PowerUp.Core.Compilation;
+﻿using Microsoft.Extensions.Configuration;
+using PowerUp.Core.Compilation;
 using PowerUp.Core.Console;
 using PowerUp.Core.Decompilation;
 using System;
@@ -131,6 +132,89 @@ namespace PowerUp.Watcher
         }
 
         //
+        // Take a configuration path such as:
+        // "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\5.*"
+        // or
+        // "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\5.*\\"
+        // And try to find the pattern based on the wildcard on the same level.
+        //
+        public static string FindDirectoryWithPattern(string value)
+        {
+            var pathConfig = value;
+            var segments = pathConfig.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            string sep = Path.DirectorySeparatorChar.ToString();
+
+            var path = "";
+            for(int s = 0; s < segments.Length; s++)
+            {
+                var segment = segments[s];
+                bool handeled = false;
+                
+
+                for (int i = 0; i < segment.Length; i++)
+                {
+                    var c = segment[i];
+                    //
+                    // Find the wildcard, and if found then record
+                    // the index at which it has been found along with the correct segment id.
+                    //
+                    if (c == '*')
+                    {
+                        var dirs = Directory.EnumerateDirectories(path, segment, SearchOption.TopDirectoryOnly);
+                        //
+                        // Peek next segment, it must match.
+                        //
+                        string next = null;
+                        if (s + 1 < segments.Length)
+                            next = segments[s + 1];
+
+                        if (next != null)
+                        {
+                            bool found = false;
+                            foreach (var dir in dirs)
+                            {
+                                //
+                                // If the next segment matches with one of the inner directories then simply append it
+                                // and break the loop chain.
+                                //
+                                var innerDirs = Directory.EnumerateDirectories(dir, "*", SearchOption.TopDirectoryOnly);
+
+                                foreach (var innerDir in innerDirs)
+                                {
+                                    var dirName = Path.GetFileName(innerDir);
+                                    if (dirName == next)
+                                    {
+                                        path += Path.GetFileName(dir) + sep;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+
+                                if (found) break;
+                            }
+                        }
+                        else if(dirs.Any())
+                        {
+                            path += Path.GetFileName(dirs.First()) + sep;
+                            
+                        }
+                        //
+                        // This is a flag that informs the outer loop to not append the current segment to 
+                        // the end of the path since it has already been done.
+                        //
+                        handeled = true;
+                    }
+                }
+
+                if (handeled == false)
+                {
+                    path += segment + sep;
+                }
+            }
+
+            return path;
+        }
+        //
         // @TODO: BA Move this to it's own class once we expose more complex options
         // and parsing.
         //
@@ -159,7 +243,7 @@ namespace PowerUp.Watcher
                 //
                 // Generic Options that are fit for all compilers.
                 //
-                if(value == "up:showHelp")
+                if (value == "up:showHelp")
                 {
                     optionsToSet.ShowHelp = true;
                 }
@@ -212,7 +296,7 @@ namespace PowerUp.Watcher
                 {
                     // i + 1 = whitespace; i + 2 = word?
                     if (MatchNext(tokens, ref i, "Word"))
-                    { 
+                    {
                         var argValue = ParseCommandArgument(tokens, ref i, "level");
                         if (argValue != null)
                         {
@@ -225,7 +309,7 @@ namespace PowerUp.Watcher
                     optionsToSet.ShowASMDocumentation = true;
                     // i + 1 = whitespace; i + 2 = word?
                     if (MatchNext(tokens, ref i, "Word"))
-                    { 
+                    {
                         var argValue = ParseCommandArgument(tokens, ref i, "offset");
                         if (argValue != null)
                         {
