@@ -62,6 +62,7 @@ Print(X)      <- This is a C# function that is used to print values when the cod
 //up:simpleNames      <- Simplify compiler generated names.
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
 //up:relativeAddr     <- All instruction adresses will start from zero.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 Due to some limitations with C# attributes certain features will remain exclusively as comment-level attributes.
@@ -82,6 +83,7 @@ F# supports multiple comment-level attributes that can be used to control compil
 //up:simpleNames      <- Simplify compiler generated names.
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
 //up:relativeAddr     <- All instruction adresses will start from zero.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 ### GO Decompilation
@@ -97,6 +99,7 @@ GO supports multiple comment-level attributes that can be used to control compil
 //up:showASMDocs      <- Used to turn on ASM code documentation.
 //up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 ### Rust Dissasembly
@@ -113,6 +116,7 @@ Rust supports multiple comment-level attributes that can be used to control comp
 //up:showASMDocs offset = {X | auto} <- Used to enable jump guides in the ASM outputs. The offset argument decides the position of the documentation.
 //up:optimization level = {X} <- Set the compilation optimization level (-C opt-level)
 //up:showCode         <- Show source code maps, that map assembly instructions to source code.
+//up:diff source={X}, target={Y} <- Creates a side by side diff of methods that are provided in the 'source' and 'target' parameters.
 ```
 
 ### .NET IL Compilation
@@ -187,4 +191,27 @@ You can write IL Code as a string and compile it to a type; later, it can be fed
    var type = compiler.Compile(il);
    var asm = type.CompiledType.ToAsm();
    asm.Print();
+```
+
+## Open Source
+
+This project uses many open source projects, like:
+
+- ICsharpCodeDecompiler
+- BenchmarkDotNet
+- Microsoft Roslyn Compiler Stack 
+
+Additionally, some of the projects were pulled into PowerUp source code and modified:
+
+- X86 ASSEMBLY Visual Studio Code Template: https://github.com/13xforever/x86-assembly-textmate-bundle
+
+```
+The template was altered to support custom elements, like jump guides and numerous 'special' keywords and instructions.
+```
+
+- DiffPlex Diff: https://github.com/mmanela/diffplex
+
+```
+The project is pulled into PowerUp source code as is, but WPF, Web and WinForm projects were removed since PowerUp just needs to be able to do diffs without any
+UI Dependencies.
 ```
