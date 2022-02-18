@@ -17,6 +17,10 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 6.0.x
+        
+    - name: Setup Go environment
+      uses: actions/setup-go@v2.2.0
+      
     - name: Restore dependencies
       run: dotnet restore
     #
