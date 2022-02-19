@@ -30,6 +30,13 @@ jobs:
     - name: Set Env
       run: echo "$env:XYZ=AAAA"
       
+    - name: Simple set environment variables
+      # You may pin to the exact commit or the version.
+      # uses: trevorlloydelliott/set-environment-variables@6e117811abc56323c2d24209039f6f49ffa7d265
+      uses: trevorlloydelliott/set-environment-variables@v1.0.0
+      with:
+        TEST_ABC: "Hello"
+      
     - name: Check Env2
       run: env
     
