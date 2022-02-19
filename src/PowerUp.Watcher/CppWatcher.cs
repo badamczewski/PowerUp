@@ -11,18 +11,25 @@ using System.Threading.Tasks;
 
 namespace PowerUp.Watcher
 {
-    public class RustWatcher
+    /*
+     * 
+     * -g -o /tmp/compiler-explorer-compiler2022118-6751-6nhydi.xygki/output.s -mllvm --x86-asm-syntax=intel -S --gcc-toolchain=/opt/compiler-explorer/gcc-11.2.0 -fcolor-diagnostics -fno-crash-diagnostics /tmp/compiler-explorer-compiler2022118-6751-6nhydi.xygki/example.cpp
+     * 
+     * 
+     */
+
+    public class CppWatcher
     {
         private string _pathToCompiler;
         private IConfigurationRoot _configuration;
-        public RustWatcher(IConfigurationRoot configuration)
+        public CppWatcher(IConfigurationRoot configuration)
         {
             _configuration = configuration;
         }
 
         private void Initialize(string inputFile, string outAsmFile)
         {
-            XConsole.WriteLine("Rust Lang Watcher Initialize:");
+            XConsole.WriteLine("Cpp (Clang) Lang Watcher Initialize:");
 
             XConsole.WriteLine($"`Input File`: {inputFile}");
             XConsole.WriteLine($"`ASM   File`: {outAsmFile}");
@@ -33,7 +40,7 @@ namespace PowerUp.Watcher
             if (File.Exists(outAsmFile) == false)
                 XConsole.WriteLine("'[WARNING]': ASM File doesn't exist");
 
-            _pathToCompiler = _configuration["RustCompilerPath"];
+            _pathToCompiler = _configuration["CppCompilerPath"];
 
             if (_pathToCompiler.EndsWith(Path.DirectorySeparatorChar) == false)
             {
@@ -49,11 +56,10 @@ namespace PowerUp.Watcher
         public Task WatchFile(string inputFile, string outAsmFile)
         {
             Initialize(inputFile, outAsmFile);
-
             var tmpAsmFile = outAsmFile + "_tmp.asm";
-            var command = $"{_pathToCompiler}rustc.exe {inputFile} -o {tmpAsmFile} " +
-                "-C debuginfo=1 " +
-                $"--emit asm --crate-type rlib -Cllvm-args=--x86-asm-syntax=intel";
+            var command = $"\"{_pathToCompiler}clang.exe\" -g -o {tmpAsmFile} " +
+                "-mllvm --x86-asm-syntax=intel -S " +
+                $"-fcolor-diagnostics -fno-crash-diagnostics {inputFile}";
 
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
@@ -75,7 +81,7 @@ namespace PowerUp.Watcher
                                 var commandToCall = command;
 
                                 if (options.OptimizationLevel > 0)
-                                    commandToCall += $" -C opt-level={options.OptimizationLevel}";
+                                    commandToCall += $" -O{options.OptimizationLevel}";
 
                                 XConsole.WriteLine($"Calling: {commandToCall}");
                                 var info = WatcherUtils.StartCompilerProcess(commandToCall, errorPattern: "error");
@@ -221,31 +227,35 @@ namespace PowerUp.Watcher
         private DecompiledMethod[] ParseASM(string fileName, string asm, string code)
         {
             //
-            // Functions in rust asm have a simple way of detecting them,
+            // Functions in Clang asm have a simple way of detecting them,
             // This is a function:
-            //   	.def	 _ZN5_code5test217h8b07b3430a90b6d8E;
-            //  	.scl    2;
-            //  	.type   32;
-            //  	.endef
-            //      .section.text,"xr",one_only,_ZN5_code5test217h8b07b3430a90b6d8E
-            //  .globl _ZN5_code5test217h8b07b3430a90b6d8E
-            //  	.p2align    4, 0x90
-            //  _ZN5_code5test217h8b07b3430a90b6d8E:
-            //      mov eax, ecx
-            //      imul eax, ecx
-            //      imul eax, ecx
-            //      ret
+            //
+            //   .globl  "?name@@YAHH@Z"                    # -- Begin function ?name@@YAHH@Z
+            //   .p2align    4, 0x90
+            //   "?name@@YAHH@Z":                           # @"?name@@YAHH@Z"
+            //   .Lfunc_begin0:
+            //   
+            //    .cv_func_id 0
+            //    .cv_file    1 "D:\\01_BA\\PowerUp\\_code.cpp" "95791644EC6EA5B20F19411AAF68B148" 1
+            //    .cv_loc 0 1 6 0                         # _code.cpp:6:0
+            //   # %bb.0:
+            //   	#DEBUG_VALUE: name:num <- $ecx
+            //   	.cv_loc 0 1 8 0                         # _code.cpp:8:0
+            //   	mov eax, ecx
+            //   .Ltmp0:
+            //   # DEBUG_VALUE: name:num <- $eax          
+            //     cmp ecx, 1
+            //
             //
             // each function will contain some field metadata and a rather cryptic label like:
             //
-            //     _ZN8testtest4test17hcb234a4e4ec86ae3E
+            //     "?name@@YAHH@Z"
             //
             // This label contains all of the data that we need to extract:
             //
-            //     ZN[X]{filename}[FUNCTION_LEN]{functionname}[ID_THAT_WE_DONT_CARE_ABOUT]
+            //     ?{function name}@@[ID_THAT_WE_DONT_CARE_ABOUT]
             // 
             // This is a rather simple pattern to extract and we are only interested in the function name.
-            // 
             // We shall skip everything else and parse instructions only to a new empty line.
             //
 
@@ -255,6 +265,7 @@ namespace PowerUp.Watcher
                 .Trim()
                 .Split("\n");
 
+            Dictionary<string, string> regMap = new Dictionary<string, string>();
             Dictionary<string,ulong> labels  = new Dictionary<string, ulong>();
             List<DecompiledMethod>   methods = new List<DecompiledMethod>();
             DecompiledMethod decompiledMethod = null;
@@ -265,7 +276,7 @@ namespace PowerUp.Watcher
                 var line = lines[i];
                 line = line.Trim();
 
-                if (line.StartsWith("_ZN"))
+                if (line.StartsWith(".globl\t\"?"))
                 {
                     var methodName = ParseMethodHeader(fileName, line);
                     if (methodName != null)
@@ -277,10 +288,49 @@ namespace PowerUp.Watcher
                         index = 0;
                     }
                 }
-                else if (line == "")
+                //
+                // Let's only focus on registers (they are prefixed with $)
+                //
+                else if(line.StartsWith("#DEBUG_VALUE:") && line.Contains("$"))
+                {
+                    var mapValue = line.Replace("#DEBUG_VALUE:", string.Empty);
+                    var kv = mapValue.Split(" <- ");
+                    if (regMap.TryGetValue(kv[0], out var value))
+                    {
+                        if (value != kv[1])
+                        {
+                            var instruction = new AssemblyInstruction();
+                            instruction.Instruction = mapValue;
+                            instruction.Arguments = new InstructionArg[0];
+                            instruction.Type = InstructionType.Code;
+                            decompiledMethod.Instructions.Add(instruction);
+                            decompiledMethod.CodeSize = (uint)index;
+                            index++;
+
+                            regMap[kv[0]] = kv[1];
+                        }
+                    }
+                    else
+                    {
+                        var instruction = new AssemblyInstruction();
+                        instruction.Instruction = mapValue;
+                        instruction.Arguments = new InstructionArg[0];
+                        instruction.Type = InstructionType.Code;
+                        decompiledMethod.Instructions.Add(instruction);
+                        decompiledMethod.CodeSize = (uint)index;
+                        index++;
+
+                        regMap.Add(kv[0], kv[1]);
+                    }
+                }
+                else if (line.StartsWith(".Lfunc_end"))
                 {
                     SetJumpsBasedOnLabels(decompiledMethod, labels);
                     decompiledMethod = null;
+                }
+                else if(line.StartsWith("#") || line.StartsWith("\""))
+                {
+                    continue;
                 }
                 else if(line.StartsWith(".cv_loc"))
                 {
@@ -288,7 +338,7 @@ namespace PowerUp.Watcher
                     // The label called .cv_loc is a source map instruction.
                     //
                     // These lables are not as usefull as you might think
-                    // since they don't map well to rust code when we compile with optimizations
+                    // since they don't map well to cpp code when we compile with optimizations
                     // and they provide minimal support, but regardless if we have them in the asm,
                     // then we should use them.
                     //
@@ -455,34 +505,20 @@ namespace PowerUp.Watcher
             //
             // Header:
             //
-            // ZN[X]{filename}[FUNCTION_LEN]{functionname}[ID_THAT_WE_DONT_CARE_ABOUT]
+            // .globl	"?{name}@@YAHH@Z" 
             //
 
             // 
-            // 1. Find the file name
+            // 1. Find the start of name
             //
-            var fnIndex = header.IndexOf(fileName);
+            var fnIndex = header.IndexOf("?");
             if (fnIndex != -1)
             {
+                var fnEndIndex = header.IndexOf("@");
                 //
                 // 2. Skip over the length
                 //
-                var lenOfLength = fileName.Length.ToString().Length;
-                //
-                // 3. Get the function name
-                //
-                int len = 0;
-                var startIndex = fnIndex + fileName.Length + lenOfLength;
-                for (int i = startIndex; i < header.Length; i++)
-                {
-                    var c = header[i];
-                    if (!char.IsLetter(c) && !char.IsPunctuation(c) && !char.IsSymbol(c))
-                    {
-                        break;
-                    }
-                    len++;
-                }
-                methodName = header.Substring(startIndex, len);
+                methodName = header.Substring(fnIndex + 1, fnEndIndex - fnIndex - 1);
             }
             return methodName;
         }

@@ -101,8 +101,10 @@ namespace PowerUp.Core.Console
         {
             var count = 0;
             var lastStyle = NetConsole.ForegroundColor;
-            NetConsole.ForegroundColor = patterns[pattern].Color;
-
+            if (patterns.TryGetValue(pattern, out var color))
+            {
+                NetConsole.ForegroundColor = color.Color;
+            }
             for (; i < tokens.Count; i++)
             {
                 var token = tokens[i];

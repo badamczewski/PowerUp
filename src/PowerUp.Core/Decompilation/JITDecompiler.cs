@@ -577,7 +577,7 @@ namespace PowerUp.Core.Decompilation
                                     result =
                                         new AssemblyInstruction()
                                         {
-                                            IsCode = true,
+                                            Type = InstructionType.Code,
                                             Instruction = blockTrim,
                                             OrdinalIndex = instructionIndex++,
                                             Arguments = Array.Empty<InstructionArg>()
@@ -613,7 +613,7 @@ namespace PowerUp.Core.Decompilation
                                         style =
                                             new AssemblyInstruction()
                                             {
-                                                IsCode = true,
+                                                Type = InstructionType.Code,
                                                 Instruction = sliceValue,
                                                 OrdinalIndex = instructionIndex++,
                                                 Arguments = Array.Empty<InstructionArg>()

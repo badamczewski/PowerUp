@@ -199,7 +199,7 @@ namespace PowerUp.Watcher
                     // method that we should not even parse.
                     //
                     if (inst.Instruction == null) continue;
-                    if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
+                    if (inst.Type == InstructionType.Code && unit.Options.ShowSourceMaps == false) continue;
 
                     lineBuilder.Append("  ");
                     //
@@ -500,7 +500,7 @@ namespace PowerUp.Watcher
                         if (sourceCodeLine != -1 && lastSourceLine != sourceCodeLine)
                         {
                             AssemblyInstruction sourceCodeInst = new AssemblyInstruction();
-                            sourceCodeInst.IsCode = true;
+                            sourceCodeInst.Type = InstructionType.Code;
                             sourceCodeInst.Instruction = $"{sourceCodeLines[sourceCodeLine - 1].Trim()}";
                             sourceCodeInst.OrdinalIndex = index;
                             sourceCodeInst.Arguments = new InstructionArg[0];

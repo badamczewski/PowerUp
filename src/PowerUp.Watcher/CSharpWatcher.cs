@@ -489,18 +489,17 @@ namespace PowerUp.Watcher
                     builder.AppendLine("  " + XConsole.ConsoleBorderStyle.Bullet + "inlined" + " " + inliningCall);
                 }
 
-                var firstInst = method.Instructions.First(x => x.IsCode == false);
+                var firstInst = method.Instructions.First(x => x.Type == InstructionType.ASM);
                 var baseAddr = firstInst.Address;
-
 
                 double avgOffset = 0; 
                 foreach (var inst in method.Instructions)
                 {
                     lineBuilder.Clear();
 
-                    if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
+                    if (inst.Type == InstructionType.Code && unit.Options.ShowSourceMaps == false) continue;
 
-                    if (inst.IsCode == false && unit.Options.RelativeAddresses == true)
+                    if (inst.Type == InstructionType.ASM && unit.Options.RelativeAddresses == true)
                     {
                         inst.Address    -= baseAddr;
                         inst.RefAddress -= baseAddr;
@@ -570,7 +569,7 @@ namespace PowerUp.Watcher
                 int lineIdx = 0;
                 foreach (var inst in method.Instructions)
                 {
-                    if (inst.IsCode && unit.Options.ShowSourceMaps == false) continue;
+                    if (inst.Type == InstructionType.Code && unit.Options.ShowSourceMaps == false) continue;
 
                     //
                     // @TODO this is bad design, we should be using the string builder

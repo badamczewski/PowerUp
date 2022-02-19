@@ -75,7 +75,7 @@ namespace PowerUp.Watcher
             //
             // Do nothing with code.
             //
-            if (inst.IsCode) return;
+            if (inst.Type == InstructionType.Code) return;
             lineBuilder.Append($"{FormatAsAddress(inst.Address, AddressCutBy, AddressPad, zeroPad)}: ");
         }
 
@@ -107,7 +107,7 @@ namespace PowerUp.Watcher
         {
             var offset = InstructionPad - inst.Instruction.Length;
             if (offset < 0) offset = 0;
-            lineBuilder.Append($"{(inst.IsCode ? "# " : "")}{inst.Instruction} " + new string(' ', offset));
+            lineBuilder.Append($"{(inst.Type == InstructionType.Code ? "# " : "")}{inst.Instruction} " + new string(' ', offset));
         }
         public void AppendMethodSignature(StringBuilder methodBuilder, DecompiledMethod method)
         {
@@ -251,7 +251,7 @@ namespace PowerUp.Watcher
             foreach (var inst in method.Instructions)
             {
                 if (inst.Instruction == null) continue;
-                if (inst.IsCode) continue;
+                if (inst.Type == InstructionType.Code) continue;
 
                 AppendInstructionName(lineBuilder, inst);
 
@@ -306,7 +306,7 @@ namespace PowerUp.Watcher
                     //
                     // Move until we have a valid instruction.
                     //
-                    while(instId < target.Instructions.Count && target.Instructions[instId].IsCode)
+                    while(instId < target.Instructions.Count && target.Instructions[instId].Type == InstructionType.Code)
                         instId++;
 
                     if (instId < target.Instructions.Count)
