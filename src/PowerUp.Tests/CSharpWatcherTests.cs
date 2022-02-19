@@ -11,48 +11,46 @@ namespace PowerUp.Tests
     {
         private IConfigurationRoot CreateConfig()
         {
+            var dotnetPathEnv = Environment.GetEnvironmentVariable("DotNetCoreDirPathNet6");
+
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("appsettings.json", false)
                 .Build();
 
-            ValidateAndFixConfiguration(configuration, dotnetVersion: '6');
+            if (dotnetPathEnv != null)
+                configuration["DotNetCoreDirPathNet6"] = dotnetPathEnv;
+
+            TryAugmentConfiguration(configuration);
 
             return configuration;
         }
 
-        static void ValidateAndFixConfiguration(IConfigurationRoot configuration, char dotnetVersion)
+        static void TryAugmentConfiguration(IConfigurationRoot configuration)
         {
-            var dotnet = configuration["DotNetCoreDirPathNet" + dotnetVersion];
-            if(Directory.Exists(dotnet) == false)
+            foreach (var kv in configuration.GetChildren())
             {
-                var lastPathIdx = -1;
-                if (dotnet.EndsWith(Path.DirectorySeparatorChar))
-                {
-                    lastPathIdx = dotnet.LastIndexOf(Path.DirectorySeparatorChar);
-                    dotnet = dotnet.Substring(0, lastPathIdx);
-                }
                 //
-                // Remove last \\ or / and go one up.
+                // Augment all * and try to find correct directories.
                 //
-                lastPathIdx = dotnet.LastIndexOf(Path.DirectorySeparatorChar);
-                dotnet = dotnet.Substring(0, lastPathIdx);
-                dotnet += Path.DirectorySeparatorChar;
-
-                var dirs = Directory.EnumerateDirectories(dotnet);
-                foreach(var dir in dirs)
+                if (kv.Value.Contains("*"))
                 {
-                    var name = Path.GetFileName(dir);
-                    if (name.StartsWith(dotnetVersion))
-                    {
-                        dotnet += name + Path.DirectorySeparatorChar;
-                        configuration["DotNetCoreDirPathNet" + dotnetVersion] = dotnet;
-                        break;
-                    }
-                }
+                    //
+                    // Get augmented value and reassign it to the configuration section.
+                    //
+                    var value = WatcherUtils.FindDirectoryWithPattern(kv.Value);
+                    //
+                    // When we have a file name instread of a directory, we need to remove the
+                    // last separator that was added.
+                    //
+                    if (kv.Value.EndsWith(".dll"))
+                        value = value.Substring(0, value.Length - 1);
 
+                    configuration[kv.Key] = value;
+                }
             }
         }
+
 
         private IConfigurationRoot configuration;
 
