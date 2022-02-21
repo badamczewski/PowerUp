@@ -7,7 +7,7 @@
 
 The project features the following utilities and tools:
 
-* Live IDE Watcher (For C#, F#, GO and Rust).
+* Live IDE Watcher (For C#, F#, GO, Rust and C++ (clang)).
 * .NET JIT Dissasembler.
 * .NET IL Compiler.
 * .NET Console with rich formatting.
