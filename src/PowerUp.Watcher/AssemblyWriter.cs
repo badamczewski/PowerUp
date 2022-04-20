@@ -145,6 +145,9 @@ namespace PowerUp.Watcher
                     value = arg.Value.Substring(0, addressOrAnyInArg);
                 }
 
+                if (arg.CallCodeSize == 0)
+                    value = arg.AltValue;
+
                 //
                 // The argument is a jump and since we support many flavors of jumps (from many languages, and compilers),
                 // the argument value will most likley be eiter a lablel (LB0001) or reference to a call (THROW_HELPER).
@@ -152,7 +155,9 @@ namespace PowerUp.Watcher
                 //
                 // For compilers like Rust (and LLVM) there will be no RefAdress but the label will fill the same function.
                 //
-                lineBuilder.Append($"{value.Trim()}");
+                if (value != null)
+                    lineBuilder.Append($"{value.Trim()}");
+
                 if (instruction.RefAddress > 0)
                 {
                     lineBuilder.Append($" {FormatAsAddress(instruction.RefAddress, AddressCutBy, AddressPad, zeroPad: true)}");

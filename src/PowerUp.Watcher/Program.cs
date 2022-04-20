@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace PowerUp.Watcher
 { 
@@ -15,6 +16,8 @@ namespace PowerUp.Watcher
         static unsafe void Main(string[] args)
         {
             PrintTitle();
+
+            args = TryReadingRunCommandFile(args);
 
             XConsole.WriteLine($"`Input >>` {string.Join(" ", args)}\r\n");
 
@@ -46,6 +49,11 @@ namespace PowerUp.Watcher
                 new RustWatcherOptions(),
                 (x, y) => x.WatchFile(y.RustInput, y.AsmOutput));
 
+            parser.RegisterCommand<CppWatcher, CppWatcherOptions>("cpp",
+                new CppWatcher(configuration),
+                new CppWatcherOptions(),
+                (x, y) => x.WatchFile(y.CppInput, y.AsmOutput));
+
             var isOK = parser.Evaluate(args);
 
             ValidateConfiguration(configuration);
@@ -53,6 +61,12 @@ namespace PowerUp.Watcher
             if (isOK == false)
             {
                 XConsole.WriteLine("\r\nYou can put multiple commands in a single program run");
+                //
+                // This is neet if you neet to test or run the tool frequently.
+                //
+                XConsole.WriteLine("\r\nYou can also provide a command file (run.cmd) and leave it in the program directory");
+                XConsole.WriteLine("and that will get used as a command for the program");
+
                 return;
             }
             //
@@ -76,6 +90,18 @@ namespace PowerUp.Watcher
                 new string(XConsole.ConsoleBorderStyle.TopBottom, 21) +
                 XConsole.ConsoleBorderStyle.BottomRight
             );
+        }
+
+        static string[] TryReadingRunCommandFile(string[] args)
+        {
+            var fileName = "run.cmd";
+            if (File.Exists(fileName))
+            {
+                args = File.ReadLines(fileName)
+                    .Select(x => x.Trim())
+                    .ToArray();
+            }
+            return args;
         }
 
         static void TryAugmentConfiguration(IConfigurationRoot configuration)

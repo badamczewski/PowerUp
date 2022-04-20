@@ -263,6 +263,17 @@ namespace PowerUp.Watcher
                 {
                     optionsToSet.RelativeAddresses = true;
                 }
+                else if (value == "up:import")
+                {
+                    if (MatchNext(tokens, ref i, "Word"))
+                    {
+                        var argValue = ParseCommandArgument(tokens, ref i, "from");
+                        if (argValue != null)
+                        {
+                            optionsToSet.ImportList.Add(argValue);
+                        }
+                    }
+                }
                 //
                 // Future
                 //

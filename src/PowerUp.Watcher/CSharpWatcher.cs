@@ -678,6 +678,7 @@ namespace PowerUp.Watcher
                 {                    
                     assemblyStream.Position = 0;
                     var loaded = ctx.LoadFromStream(assemblyStream);
+
                     List<DecompiledMethod> globalMethodList = new List<DecompiledMethod>();
                     List<TypeLayout> typesMemoryLayouts     = new List<TypeLayout>();
                     var compiledType = loaded.GetType(CSharpCodeCompiler.BaseClassName);
@@ -685,6 +686,16 @@ namespace PowerUp.Watcher
                     assemblyStream.Position = 0;
                     pdbStream.Position = 0;
 
+
+                    //
+                    // Add imported methods from the BCL to the global list. 
+                    // @NOTE: Although you can add just about any .NET internal method to the list
+                    // there is guarantee that it will dissasemble & decompile properly.
+                    // Some internal classes/methods are already optimized or are handeled in a
+                    // special way by the runtime.
+                    //
+                    AddImportedMethodsToGlobalList(unit.Options.ImportList, globalMethodList);
+                    
                     //
                     // Get IL <-> Code Map.
                     // @TODO, @NOTE: This map is curently used to just go from X86 <-> C#
@@ -858,6 +869,30 @@ namespace PowerUp.Watcher
             }
 
             return unit;
+        }
+
+        private void AddImportedMethodsToGlobalList(List<string> imports, List<DecompiledMethod> totalMethodsToAdd)
+        {
+            foreach (var import in imports)
+            {
+                var segments = import.Split('.', StringSplitOptions.RemoveEmptyEntries);
+                int remove = 1;
+                var lastSegment = segments.Last();
+                if (lastSegment.EndsWith(")"))
+                {
+                    remove = 1;
+                }
+
+                var importedType = Type.GetType(String.Join(".", segments, 0, segments.Length - remove));
+                foreach (var method in importedType.GetMethods())
+                {
+                    if (method.Name == lastSegment)
+                    {
+                        var meth = method.ToAsm();
+                        AddMethodsToGlobalList(new[] { meth }, totalMethodsToAdd);
+                    }
+                }
+            }
         }
 
         private void AddMethodsToGlobalList(DecompiledMethod[] methods, List<DecompiledMethod> totalMethodsToAdd)

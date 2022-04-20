@@ -326,7 +326,9 @@ namespace PowerUp.Core.Decompilation
             codePtr  = clrmdMethodHandle.HotColdInfo.HotStart;
             codeSize = clrmdMethodHandle.HotColdInfo.HotSize;
 
-            if (clrmdMethodHandle.NativeCode == ulong.MaxValue)
+            bool isInternal = method.Module.Name == "System.Private.CoreLib.dll";
+
+            if (clrmdMethodHandle.NativeCode == ulong.MaxValue || isInternal)
             {
                 //
                 // Method wasn't found using simple handle lookup.
@@ -702,7 +704,7 @@ namespace PowerUp.Core.Decompilation
                 name = jitHelperFunctionName;
                 return true;
             }
-
+          
             //var methodTableName = runtime.GetMethodTableName(refAddress);
             //if (string.IsNullOrWhiteSpace(methodTableName) == false)
             //{
@@ -721,10 +723,11 @@ namespace PowerUp.Core.Decompilation
 
             var methodCall = runtime.GetMethodByInstructionPointer(refAddress);
             if (methodCall != null && string.IsNullOrWhiteSpace(methodCall.Name) == false)
-            {
+            {               
                 name = methodCall.ToString();
                 refAddress = methodCall.HotColdInfo.HotStart;
                 codeSize = methodCall.HotColdInfo.HotSize;
+
                 return true;
             }
 

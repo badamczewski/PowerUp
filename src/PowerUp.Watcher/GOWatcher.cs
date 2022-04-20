@@ -623,7 +623,9 @@ namespace PowerUp.Watcher
                     }
                     else
                     {
-                        instructionArg.Value += tokens[argsIndex].GetValue();
+                        instructionArg.Value    += tokens[argsIndex].GetValue();
+                        instructionArg.AltValue += tokens[argsIndex].GetValue();
+
                         if (jumpInstructions.Contains(instruction.Instruction))
                         {
                             instruction.RefAddress = ulong.Parse(instructionArg.Value); 

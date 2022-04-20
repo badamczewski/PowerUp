@@ -477,8 +477,10 @@ namespace PowerUp.Watcher
                     }
                     else
                     {
-                        instructionArg.Value += token.GetValue();
-                        if(AssemblyWriter.JumpInstructions.Contains(instruction.Instruction))
+                        instructionArg.Value    += token.GetValue();
+                        instructionArg.AltValue += token.GetValue();
+
+                        if (AssemblyWriter.JumpInstructions.Contains(instruction.Instruction))
                         {
                             //
                             // Label jump means that there is a jump but we don't
