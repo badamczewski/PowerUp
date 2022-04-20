@@ -878,18 +878,20 @@ namespace PowerUp.Watcher
                 var segments = import.Split('.', StringSplitOptions.RemoveEmptyEntries);
                 int remove = 1;
                 var lastSegment = segments.Last();
-                if (lastSegment.EndsWith(")"))
-                {
-                    remove = 1;
-                }
 
                 var importedType = Type.GetType(String.Join(".", segments, 0, segments.Length - remove));
                 foreach (var method in importedType.GetMethods())
                 {
                     if (method.Name == lastSegment)
                     {
-                        var meth = method.ToAsm();
-                        AddMethodsToGlobalList(new[] { meth }, totalMethodsToAdd);
+                        //
+                        // Not all methods can be dissasembled, so skip those that can't
+                        //
+                        var asm = method.ToAsm();
+                        if (asm.Instructions.Any() == true)
+                        {
+                            AddMethodsToGlobalList(new[] { asm }, totalMethodsToAdd);
+                        }
                     }
                 }
             }
