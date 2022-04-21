@@ -27,7 +27,7 @@ namespace PowerUp.Core.Console
 
         public static void DrawPlot(int x, int y, double[] values)
         {
-            var topCopy = NetConsole.CursorTop;
+            var topCopy  = NetConsole.CursorTop;
             var leftCopy = NetConsole.CursorLeft;
 
             var max = values.Max();

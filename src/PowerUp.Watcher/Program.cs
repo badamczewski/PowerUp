@@ -62,7 +62,7 @@ namespace PowerUp.Watcher
             {
                 XConsole.WriteLine("\r\nYou can put multiple commands in a single program run");
                 //
-                // This is neet if you neet to test or run the tool frequently.
+                // This is neet if you neat to test or run the tool frequently.
                 //
                 XConsole.WriteLine("\r\nYou can also provide a command file (run.cmd) and leave it in the program directory");
                 XConsole.WriteLine("and that will get used as a command for the program");
@@ -97,6 +97,8 @@ namespace PowerUp.Watcher
             var fileName = "run.cmd";
             if (File.Exists(fileName))
             {
+                XConsole.WriteLine("`Pulling Args from run.cmd.`");
+
                 args = File.ReadLines(fileName)
                     .Select(x => x.Trim())
                     .ToArray();
