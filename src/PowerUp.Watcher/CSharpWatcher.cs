@@ -43,8 +43,8 @@ namespace PowerUp.Watcher
 
         // $env:DOTNET_TC_QuickJitForLoops = 1
         // $env:DOTNET_TieredPGO = 1
-        private bool _isPGO = false; 
-
+        private bool _isPGO = false;
+             
         public static bool IsDebug
         {
             get
@@ -203,22 +203,20 @@ namespace PowerUp.Watcher
                                     WriteIfNotNullOrEmpty(outCSFile,  errors);
                                 }
                                 else
-                                {    
-                                    if (unit.DecompiledMethods != null)
+                                {
+                                    //
+                                    if (TryWriteASM(unit, out asmCode) == false)
                                     {
-                                        //
-                                        // Hide internal methods that get produced by the IL Compiler and C# Compiler
-                                        //
-                                        HideInternalDecompiledMethods(unit.DecompiledMethods);
-                                        asmCode = ToAsmString(unit);
-                                    }
-                                    // 
-                                    if (unit.ILTokens != null)
-                                    {
-                                        ilCode = ToILString(unit);
+                                        XConsole.WriteLine($"Writing Errors to: {outAsmFile}");
                                     }
                                     //
-                                    if(unit.OutputSourceCode != null)
+                                    if (TryWriteIL(unit, out ilCode) == false)
+                                    {
+                                        XConsole.WriteLine($"Writing Errors to: {outILFile}");
+                                    }
+                                    // 
+                                    //
+                                    if (unit.OutputSourceCode != null)
                                     {
                                         csCode = unit.OutputSourceCode;
                                     }
@@ -257,6 +255,52 @@ namespace PowerUp.Watcher
                 }  
             });
             return iDontCareAboutThisTask;
+        }
+
+        private bool TryWriteASM(DecompilationUnit unit, out string result)
+        {
+            bool isOK = false;
+            result = string.Empty;
+
+            if (unit.ILTokens != null)
+            {
+                try
+                {
+                    result = ToILString(unit);
+                    isOK = true;
+                }
+                catch (Exception ex)
+                {
+                    result = ex.ToString();
+                    isOK = false;
+                }
+            }
+
+            return isOK;
+        }
+
+        private bool TryWriteIL(DecompilationUnit unit, out string result)
+        {
+            bool isOK = false;
+            result = string.Empty;
+            if (unit.DecompiledMethods != null)
+            {
+                //
+                // Hide internal methods that get produced by the IL Compiler and C# Compiler
+                //
+                try
+                {
+                    HideInternalDecompiledMethods(unit.DecompiledMethods);
+                    result = ToAsmString(unit);
+                    isOK = true;
+                }
+                catch (Exception ex)
+                {
+                    result = ex.ToString();
+                    isOK = false;
+                }
+            }
+            return isOK;
         }
 
         private void WriteCompilerVersion(StringBuilder content, DecompilationUnit unit)
