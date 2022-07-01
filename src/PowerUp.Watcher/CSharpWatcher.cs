@@ -257,7 +257,7 @@ namespace PowerUp.Watcher
             return iDontCareAboutThisTask;
         }
 
-        private bool TryWriteASM(DecompilationUnit unit, out string result)
+        private bool TryWriteIL(DecompilationUnit unit, out string result)
         {
             bool isOK = false;
             result = string.Empty;
@@ -279,7 +279,7 @@ namespace PowerUp.Watcher
             return isOK;
         }
 
-        private bool TryWriteIL(DecompilationUnit unit, out string result)
+        private bool TryWriteASM(DecompilationUnit unit, out string result)
         {
             bool isOK = false;
             result = string.Empty;

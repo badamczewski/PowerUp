@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace PowerUp.Watcher
 { 
@@ -99,9 +100,21 @@ namespace PowerUp.Watcher
             {
                 XConsole.WriteLine("`Pulling Args from run.cmd.`");
 
-                args = File.ReadLines(fileName)
+                //
+                // Args need to be split 
+                //
+                List<string> arguments = new List<string>();
+
+                var lines = File.ReadLines(fileName)
                     .Select(x => x.Trim())
-                    .ToArray();
+                    .ToArray(); 
+
+                foreach(var line in lines)
+                {
+                    arguments.AddRange(line.Split(" "));
+                }
+
+                args = arguments.ToArray();
             }
             return args;
         }

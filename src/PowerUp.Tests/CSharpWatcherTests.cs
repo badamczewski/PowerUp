@@ -15,7 +15,7 @@ namespace PowerUp.Tests
 
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("appsettings.json", false)
+                .AddJsonFile("appsettings_tests.json", false)
                 .Build();
 
             if (dotnetPathEnv != null)
