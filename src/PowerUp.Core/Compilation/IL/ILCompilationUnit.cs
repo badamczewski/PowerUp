@@ -7,6 +7,6 @@ namespace PowerUp.Core.Compilation
     public class ILCompilationUnit
     {
         public Type CompiledType { get; set; }
-        public List<Error> Errors { get; set; } = new();
+        public List<Error> Errors { get; set; } = new List<Error>();
     }
 }

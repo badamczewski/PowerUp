@@ -91,8 +91,8 @@ namespace PowerUp.Core.Decompilation
         public bool IsVisible { get; set; } = true;
         public uint CodeSize { get; set; }
         public ulong CodeAddress { get; set; }
-        public List<string> Messages { get; set; } = new();
-        public List<MethodSignature> Calls { get; set; } = new();
+        public List<string> Messages { get; set; } = new List<string>();
+        public List<MethodSignature> Calls { get; set; } = new List<MethodSignature>();
         public override string ToString()
         {
             StringBuilder builder = new StringBuilder();

@@ -5,6 +5,6 @@ namespace PowerUp.Watcher
     public class Command
     {
         public string Name { get; set; }
-        public List<string> Arguments { get; set; } = new();
+        public List<string> Arguments { get; set; } = new List<string>();
     }
 }

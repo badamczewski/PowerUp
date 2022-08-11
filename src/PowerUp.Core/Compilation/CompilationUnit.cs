@@ -28,7 +28,7 @@ namespace PowerUp.Core.Compilation
         // The compilation map, maps specific compilation instructions to language objects
         // like methods, structs, classes fields and other.
         //
-        public Dictionary<string, string> CompilationMap { get; set; } = new();
+        public Dictionary<string, string> CompilationMap { get; set; } = new Dictionary<string, string>();
         /// <summary>
         /// Should help be displayed by the watcher.
         /// </summary>

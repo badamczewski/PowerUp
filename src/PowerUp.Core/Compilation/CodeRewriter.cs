@@ -12,9 +12,9 @@ namespace PowerUp.Core.Compilation
     public class CodeRewriter : CSharpSyntaxRewriter
     {
         private readonly CompilationOptions _options;
-        private readonly StringBuilder _benchCodeBuilder = new();
-        private readonly StringBuilder _usingBuilder     = new();
-        private readonly StringBuilder _structSizeOfbuilder = new();
+        private readonly StringBuilder _benchCodeBuilder = new StringBuilder();
+        private readonly StringBuilder _usingBuilder     = new StringBuilder();
+        private readonly StringBuilder _structSizeOfbuilder = new StringBuilder();
 
         public CodeRewriter(CompilationOptions options)
         {

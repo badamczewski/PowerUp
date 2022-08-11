@@ -38,7 +38,7 @@ namespace PowerUp.Core.Decompilation
 
         public IList<ICSharpCode.Decompiler.DebugInfo.SequencePoint> GetSequencePoints(MethodDefinitionHandle method)
         {
-            List<ICSharpCode.Decompiler.DebugInfo.SequencePoint> sequencePoints = new();
+            List<ICSharpCode.Decompiler.DebugInfo.SequencePoint> sequencePoints = new List<ICSharpCode.Decompiler.DebugInfo.SequencePoint>();
             var info = _metadataReader.GetMethodDebugInformation(method);
             var points = info.GetSequencePoints();
 

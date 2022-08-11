@@ -133,15 +133,32 @@ namespace PowerUp.Watcher
             XConsole.WriteLine(IsDebug ? "'[DEBUG]'" : "`[RELEASE]`");
         }
 
+
+        //
+        // @TODO @DESIGN: Not sure if I like this.
+        // All watchers should be albe to run on any installed runtime and this should
+        // be a dynamic process (the user should be albe to use a command flag)
+        // 
+        // To be able to do this, the C# and F# (dotnet) watchers would need to work by calling
+        // a seperate decompilation / dissasembly process.
+        //
         public void InitializeCsharpCompiler()
         {
-            if (Environment.Version.Major == 5)
+            if(Environment.Version.Major == 3)
+            {
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet3"]);
+            }
+            else if (Environment.Version.Major == 5)
             {
                 _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet5"]);
             }
             else if (Environment.Version.Major == 6)
             {
                 _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet6"], LanguageVersion.Default);
+            }
+            else if (Environment.Version.Major == 7)
+            {
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet7"], LanguageVersion.Default);
             }
             else
             {
@@ -869,7 +886,7 @@ namespace PowerUp.Watcher
                                 }
                                 else if (attribute == "PGO")
                                 {
-                                    List<string> messages = new();
+                                    List<string> messages = new List<string>();
                                     //
                                     // If PGO is not enabled then don't even bother running any methods.
                                     //

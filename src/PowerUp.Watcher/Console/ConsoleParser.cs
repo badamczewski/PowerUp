@@ -112,7 +112,7 @@ namespace PowerUp.Watcher
         }
 
         private static List<Command> ParseArguments(string[] args)
-        {
+       {
             //
             // Parse Console Arguments:
             //   

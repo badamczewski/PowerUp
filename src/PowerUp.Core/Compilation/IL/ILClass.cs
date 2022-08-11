@@ -6,7 +6,7 @@ namespace PowerUp.Core.Compilation
     {
         //Fields
         //Methods
-        public List<ILMethod> Methods { get; set; } = new();
+        public List<ILMethod> Methods { get; set; } = new List<ILMethod>();
         //Other Classes / Structs
     }
 }
