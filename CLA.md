@@ -12,3 +12,4 @@ All contributors that made changes to PowerUp before the "Contributor License Ag
 
 1. Bartosz Adamczewski
 2. Yoh Deadfall
+3. Andrii Rybalko
