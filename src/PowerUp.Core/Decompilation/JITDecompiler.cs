@@ -328,7 +328,7 @@ namespace PowerUp.Core.Decompilation
 
             bool isInternal = method.Module.Name == "System.Private.CoreLib.dll";
 
-            if (clrmdMethodHandle.NativeCode == ulong.MaxValue || isInternal)
+            if (clrmdMethodHandle.NativeCode == ulong.MaxValue || isInternal || codeSize == 0)
             {
                 //
                 // Method wasn't found using simple handle lookup.
