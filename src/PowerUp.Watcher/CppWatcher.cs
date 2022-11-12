@@ -141,6 +141,8 @@ namespace PowerUp.Watcher
                 return builder.ToString();
             }
 
+
+
             //
             // Diff selected methods.
             //

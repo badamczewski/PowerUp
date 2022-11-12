@@ -247,7 +247,11 @@ namespace PowerUp.Watcher
                 {
                     optionsToSet.ShowHelp = true;
                 }
-                if (value == "up:showGuides")
+                else if (value == "up:customAttributes")
+                {
+                    optionsToSet.UseCustomAttributes = true;
+                }
+                else if (value == "up:showGuides")
                 {
                     optionsToSet.ShowGuides = true;
                 }

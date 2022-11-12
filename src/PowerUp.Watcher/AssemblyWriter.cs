@@ -425,9 +425,12 @@ namespace PowerUp.Watcher
                     case "add":   DocumentADD(lineBuilder, instruction); break;
                     case "sub":   DocumentSUB(lineBuilder, instruction); break;
                     case "xor":   DocumentXOR(lineBuilder, instruction); break;
+                    case "vxorps":DocumentVXORPS(lineBuilder, instruction); break;
                     case "ret":   DocumentRET(lineBuilder, instruction); break;
                     case "cmp":   DocumentCMP(lineBuilder, instruction, method); break;
                     case "test":  DocumentTEST(lineBuilder, instruction, method); break;
+                    case "nop":   DocumentNOP(lineBuilder, instruction, method); break;
+                    case "vaddsd":DocumentVADDSD(lineBuilder, instruction, method); break;
                     default:
                         {
                             if (instruction.Instruction.StartsWith(".") && instruction.Instruction.EndsWith(":"))
@@ -456,6 +459,27 @@ namespace PowerUp.Watcher
                 //
                 XConsole.WriteLine($"'Documentation Generation Failed with message: {ex.Message}'");
             }
+        }
+
+        private void DocumentNOP(StringBuilder lineBuilder, AssemblyInstruction instruction, DecompiledMethod method)
+        {
+            var multiByte = "";
+            if(instruction.Arguments.Any())
+            {
+                multiByte = " (Multi Byte)";
+            }
+
+            lineBuilder.Append($" # No Operation{multiByte}");
+        }
+
+        private void DocumentVADDSD(StringBuilder lineBuilder, AssemblyInstruction instruction, DecompiledMethod method)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+            var dhs = FormatArgument(instruction.Arguments[2].Value);
+
+
+            lineBuilder.Append($" # {dhs} = {lhs} + {rhs}");
         }
 
         private void DocumentMOV(StringBuilder lineBuilder, AssemblyInstruction instruction)
@@ -609,6 +633,18 @@ namespace PowerUp.Watcher
             {
                 lineBuilder.Append($" # {lhs} -= {rhs}");
             }
+        }
+
+        private void DocumentVXORPS(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            var lhs = FormatArgument(instruction.Arguments[0].Value);
+            var rhs = FormatArgument(instruction.Arguments[1].Value);
+            var dhs = FormatArgument(instruction.Arguments[2].Value);
+
+            if (lhs == rhs)
+                lineBuilder.Append($" # {dhs} = 0");
+            else
+                lineBuilder.Append($" # {dhs} = {lhs} ^ {rhs}");
         }
 
         private void DocumentXOR(StringBuilder lineBuilder, AssemblyInstruction instruction)

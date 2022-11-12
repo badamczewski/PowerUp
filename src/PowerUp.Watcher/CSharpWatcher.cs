@@ -29,6 +29,7 @@ using TypeLayout = PowerUp.Core.Decompilation.TypeLayout;
 using System.Collections;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using CompilationOptions = PowerUp.Core.Compilation.CompilationOptions;
 
 namespace PowerUp.Watcher
 {
@@ -154,17 +155,17 @@ namespace PowerUp.Watcher
             }
             else if (Environment.Version.Major == 6)
             {
-                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet6"], LanguageVersion.Default);
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet6"], LanguageVersion.CSharp9);
             }
             else if (Environment.Version.Major == 7)
             {
-                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet7"], LanguageVersion.Default);
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet7"], LanguageVersion.CSharp10);
             }
             else
             {
                 _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathDefault"]);
             }
-        }
+        } 
 
         public Task WatchFile(string csharpFile, string outAsmFile = null, string outILFile = null, string outCSFile = null)
         {
@@ -478,6 +479,12 @@ namespace PowerUp.Watcher
                 return builder.ToString();
             }
 
+            if (unit.Options.HelpText != null)
+            {
+                builder.Append(unit.Options.HelpText);
+                return builder.ToString();
+            }
+
             WriteCompilerVersion(builder, unit);
 
             builder.AppendLine();
@@ -697,24 +704,27 @@ namespace PowerUp.Watcher
         public DecompilationUnit DecompileToASM(string code)
         {
             var unit = new DecompilationUnit();
+            CompilationOptions options = new CompilationOptions();
+            options = WatcherUtils.SetCommandOptions(code, options);
+
             //
             // Compile the Source Code and set both the Compiler Options
             // and options as comments.
             //
-            var compilation = _compiler.Compile(code);
+            var compilation = _compiler.Compile(code, options);
             //
             // Get the streams, note that we have to dispose them thus 'using'
             //
             using var assemblyStream = compilation.AssemblyStream;
             using var pdbStream = compilation.PDBStream;
 
-            compilation.Options = WatcherUtils.SetCommandOptions(code, compilation.Options);
             unit.Options = compilation.Options;
             unit.InputSouceCode        = compilation.SourceCode;
             unit.OutputLanguageVersion = compilation.LanguageVersion;
             var compilationResult = compilation.CompilationResult;
 
-            XConsole.WriteLine($"Language Version: `{compilation.LanguageVersion}`");
+            XConsole.WriteLine($"Language Version: `{unit.OutputLanguageVersion}`");
+
             //
             // Create the collectible load context. This context will only compile to non-tiered
             // Optimized compilation if the collectible option is set to true, so we are leaving it
@@ -892,6 +902,7 @@ namespace PowerUp.Watcher
                                     //
                                     if (_isPGO)
                                     {
+                                        messages.Add("# [PGO]");
                                         RunPostCompilationOperations(loaded, compiledType, new[] { decompiledMethod }, null);
                                     }
                                     else
@@ -1003,7 +1014,6 @@ namespace PowerUp.Watcher
                         //
                         // Find the method under benchmark to extract it's attribute values.
                         //
-
                         (long took, int warmUpCount, int runCount) summary =
                            ((long, int, int))method.Invoke(instance, null);
 

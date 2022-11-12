@@ -31,9 +31,8 @@ namespace PowerUp.Core.Compilation
             LanguageVersion = languageVersion;
         }
 
-        public CompilationUnit Compile(string code)
+        public CompilationUnit Compile(string code, CompilationOptions options)
         {
-            CompilationOptions options = new CompilationOptions();
             var sourceCode  = RewriteCode(code, options);
             var compilation = CSharpCompilation.Create("assembly_" + DateTime.Now.Ticks.ToString())
             .WithOptions(
@@ -70,7 +69,7 @@ namespace PowerUp.Core.Compilation
         {
             var ast  = CSharpSyntaxTree.ParseText(code);
             var root = ast.GetRoot();
-
+            
             CodeRewriter rewriter = new CodeRewriter(options);
             root           = rewriter.Visit(root);
             code           = root.ToFullString();
@@ -87,6 +86,7 @@ namespace PowerUp.Core.Compilation
                     using System.Linq.Expressions;
                     using System.Runtime.InteropServices;
                     using System.Threading.Tasks;
+                    using System.Text;
 
                     {usingCode}
 

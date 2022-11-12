@@ -70,8 +70,32 @@ namespace PowerUp.Core.Compilation
 
                         var warmUpCount = TryExtractValueFromAttribute<int>(found, "WarmUpCount");
                         var runCount    = TryExtractValueFromAttribute<int>(found, "RunCount");
-                        var arguments   = TryExtractValueFromAttribute<object[]>(found, "Arguments");
+                        var arguments   = TryExtractValueFromAttribute<object[]>(found, "Arguments", Array.Empty<object[]>());
 
+                        if (_options.UseCustomAttributes)
+                            node = node.RemoveNode(list, SyntaxRemoveOptions.KeepNoTrivia);
+                        //
+                        // Do Basic argument validation
+                        //
+                        var paramsToInsert = node.ParameterList;
+                        if(paramsToInsert.Parameters.Count != arguments.Length)
+                        {
+                            _options.HelpText += "[Bench] Attribute is missing arguments" + Environment.NewLine;
+                            _options.HelpText += "Please use:" + Environment.NewLine;
+                            _options.HelpText += "    [Bench (Arguments = new object[] {";
+
+                            int count = 0;
+                            foreach (var param in paramsToInsert.Parameters)
+                            {
+                                _options.HelpText += "(" + param.Type.ToString() + ")<value>";
+                                count++;
+                                if (count < paramsToInsert.Parameters.Count)
+                                    _options.HelpText += ",";
+                            }
+                            _options.HelpText += "})]";
+
+                            return base.VisitLocalFunctionStatement(node);
+                        }
 
                         if (warmUpCount == 0) warmUpCount = 1000;
                         if (runCount == 0)    runCount = 1000;
@@ -79,18 +103,18 @@ namespace PowerUp.Core.Compilation
                         //
                         // Add Bench Code
                         //
-                        string argString = arguments != null ? string.Join(",", arguments) : "";
+                        var argString    = arguments != null ? string.Join(",", arguments) : "";
+                        var functionCall = $"{functionName}({argString})";
                         _benchCodeBuilder.Append($@"
                                     public (long,int,int) Bench_{functionName}() 
                                     {{ 
                                         Stopwatch w = new Stopwatch();
-                                        for(int i = 0; i < {warmUpCount}; i++) {functionName}({argString});
+                                        for(int i = 0; i < {warmUpCount}; i++) {functionCall};
                                         w.Start();
-                                        for(int i = 0; i < {runCount}; i++) {functionName}({argString});
+                                        for(int i = 0; i < {runCount}; i++) {functionCall};
                                         w.Stop();
                                         return (w.ElapsedMilliseconds, {warmUpCount}, {runCount});
                                     }}
-
                                     ");
                     }
                 }
@@ -199,7 +223,7 @@ namespace PowerUp.Core.Compilation
             return base.VisitAttributeList(node);
         }
 
-        private T TryExtractValueFromAttribute<T>(AttributeSyntax attr, string name)
+        private T TryExtractValueFromAttribute<T>(AttributeSyntax attr, string name, T def = default(T))
         {
             if (attr.ArgumentList != null)
             {
@@ -225,7 +249,7 @@ namespace PowerUp.Core.Compilation
                 }
             }
 
-            return default(T);
+            return def;
         }
 
         private object ToArray(ArrayCreationExpressionSyntax array)
@@ -238,9 +262,23 @@ namespace PowerUp.Core.Compilation
                     var element = arrayLiteral.Token.Value;
                     list.Add(element);
                 }
+                else if(_options.UseCustomAttributes && exp is ObjectCreationExpressionSyntax objectCreation)
+                {
+                    list.Add(new ObjectCreation() { CreationExpr = objectCreation.ToString() });
+                }
             }
             object obj = list.ToArray();
             return obj;
+        }
+
+        public class ObjectCreation
+        {
+            public string CreationExpr { get; set; }
+
+            public override string ToString()
+            {
+                return CreationExpr;
+            }
         }
 
         private object ToArray(ImplicitArrayCreationExpressionSyntax array)
@@ -252,6 +290,10 @@ namespace PowerUp.Core.Compilation
                 {
                     var element = arrayLiteral.Token.Value;
                     list.Add(element);
+                }
+                else if (_options.UseCustomAttributes && exp is ObjectCreationExpressionSyntax objectCreation)
+                {
+                    list.Add(new ObjectCreation() { CreationExpr = objectCreation.ToString() });
                 }
             }
             object obj = list.ToArray();

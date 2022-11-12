@@ -33,6 +33,9 @@ namespace PowerUp.Core.Compilation
         /// Should help be displayed by the watcher.
         /// </summary>
         public bool ShowHelp { get; set; }
+
+        public string HelpText { get; set; }
+
         /// <summary>
         /// Should jump guides be rendered with the output.
         /// </summary>
@@ -86,6 +89,10 @@ namespace PowerUp.Core.Compilation
         /// output.
         /// </summary>
         public List<string> ImportList { get; set; } = new List<string>();
+        /// <summary>
+        /// Allow for simplified custom attributes that the Source Language does not support normally.
+        /// </summary>
+        public bool UseCustomAttributes { get; set; }
 
         public CompilationOptions() { }
     }

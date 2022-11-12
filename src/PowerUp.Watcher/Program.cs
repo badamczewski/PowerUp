@@ -18,7 +18,8 @@ namespace PowerUp.Watcher
         {
             PrintTitle();
 
-            args = TryReadingRunCommandFile(args);
+            if (args.Length == 0)
+                args = TryReadingRunCommandFile(args);
 
             XConsole.WriteLine($"`Input >>` {string.Join(" ", args)}\r\n");
 

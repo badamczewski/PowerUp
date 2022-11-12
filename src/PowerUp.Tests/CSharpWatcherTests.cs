@@ -118,13 +118,23 @@ namespace PowerUp.Tests
         }
 
         [Test]
-        public void DecompileToIL_EmptyFunction_ShouldHaveIL()
+        public void DecompileToASM_EmptyFunction_ShouldHaveIL()
         {
             CSharpWatcher watcher = new CSharpWatcher(configuration);
             watcher.InitializeCsharpCompiler();
             var result = watcher.DecompileToASM("public void M(){}");
 
             Assert.IsTrue(result.ILTokens.Length > 0);
+        }
+
+        [Test]
+        public void DecompileToASM_EmptyFunction_ShouldHaveOutputSourceCode()
+        {
+            CSharpWatcher watcher = new CSharpWatcher(configuration);
+            watcher.InitializeCsharpCompiler();
+            var result = watcher.DecompileToASM("public void M(){}");
+
+            Assert.IsTrue(result.OutputSourceCode.Length > 0);
         }
 
         [Test]
