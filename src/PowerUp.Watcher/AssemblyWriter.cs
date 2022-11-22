@@ -3,6 +3,7 @@ using PowerUp.Core.Console;
 using PowerUp.Core.Decompilation;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,6 +11,54 @@ using static PowerUp.Core.Console.XConsole;
 
 namespace PowerUp.Watcher
 {
+    public class OutputBuilder : IDisposable
+    {
+        private readonly StringBuilder builder = new StringBuilder();
+        private readonly StreamWriter writer = null;
+        public OutputBuilder(string path)
+        {
+            if (File.Exists(path))
+            {
+                FileStream stream = new FileStream(path, FileMode.Truncate, FileAccess.ReadWrite, FileShare.ReadWrite);
+                writer = new StreamWriter(stream);
+            }
+        }
+
+        public void AppendLine(string text = null)
+        {
+            builder.AppendLine(text);
+        }
+
+        public void Append(string text) 
+        {
+            builder.Append(text);
+        }
+
+        public void Clear() { builder.Clear(); }
+
+        public void Write() 
+        {
+            writer?.Write(builder.ToString());
+            writer?.Flush();
+            builder.Clear();
+        }
+
+        public void Dispose()
+        {
+            if (builder.Length != 0)
+            {
+                Write();
+            }
+            writer?.Dispose();
+        }
+
+        public override string ToString()
+        {
+            Dispose();
+            return builder.ToString();
+        }
+    }
+
     //
     // This class writes out common formatting
     // that all compilers tend to use for display,
@@ -51,7 +100,7 @@ namespace PowerUp.Watcher
         public int AddressCutBy { get; set; } = 0;
         public int DocumentationOffset { get; set; } = 40;
 
-        public void AppendHelp(StringBuilder helpBuilder)
+        public void AppendHelp(OutputBuilder helpBuilder)
         {
             var sep = new string(XConsole.ConsoleBorderStyle.TopBottom, 20);
             helpBuilder.AppendLine("# Help:");
@@ -109,7 +158,7 @@ namespace PowerUp.Watcher
             if (offset < 0) offset = 0;
             lineBuilder.Append($"{(inst.Type == InstructionType.Code ? "# " : "")}{inst.Instruction} " + new string(' ', offset));
         }
-        public void AppendMethodSignature(StringBuilder methodBuilder, DecompiledMethod method)
+        public void AppendMethodSignature(OutputBuilder methodBuilder, DecompiledMethod method)
         {
             methodBuilder.AppendLine($"# Instruction Count: {method.Instructions.Count}; Code Size: {method.CodeSize}");
             methodBuilder.Append($"{(method.TypeName == null ? "" : method.TypeName + "+")}{method.Return} {method.Name}(");
@@ -211,7 +260,7 @@ namespace PowerUp.Watcher
             }
         }
 
-        public void AppendMessages(StringBuilder methodBuilder, DecompiledMethod method)
+        public void AppendMessages(OutputBuilder methodBuilder, DecompiledMethod method)
         {
             //
             // Print messages.
@@ -272,7 +321,7 @@ namespace PowerUp.Watcher
             return lineBuilder.ToString().Trim();
         }
 
-        public void AppendDiff(StringBuilder diffBuilder, DecompiledMethod source, DecompiledMethod target, bool appendDocs = false)
+        public void AppendDiff(OutputBuilder diffBuilder, DecompiledMethod source, DecompiledMethod target, bool appendDocs = false)
         {
             diffBuilder.AppendLine($"# Diff of {source.Name} and {target.Name}");
             StringBuilder sideBySideBuilder = new StringBuilder();

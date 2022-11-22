@@ -16,6 +16,8 @@ namespace PowerUp.Watcher
     {
         static unsafe void Main(string[] args)
         {
+            //args = new string[] { "-go", @"D:\01_BA\PowerUp\_code.go", @"D:\01_BA\PowerUp\_outGO.asm" };
+
             PrintTitle();
 
             if (args.Length == 0)

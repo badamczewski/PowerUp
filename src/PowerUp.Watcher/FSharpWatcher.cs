@@ -190,7 +190,7 @@ namespace PowerUp.Watcher
                                     {
                                         if (unit.DecompiledMethods != null)
                                         {
-                                            asmCode = ToAsmString(unit);
+                                            asmCode = ToAsmString(unit, outAsmFile);
                                         }
                                         // 
                                         if (unit.ILTokens != null)
@@ -240,7 +240,7 @@ namespace PowerUp.Watcher
             return iDontCareAboutThisTask;
         }
 
-        private void WriteCompilerVersion(StringBuilder content, DecompilationUnit unit)
+        private void WriteCompilerVersion(OutputBuilder content, DecompilationUnit unit)
         {
             content.Append($"# F# {unit.OutputLanguageVersion} .NET: {Environment.Version.ToString()} {(_isPGO ? "PGO" : "")}");
         }
@@ -386,9 +386,9 @@ namespace PowerUp.Watcher
             return layoutBuilder.ToString();
         }
 
-        public string ToAsmString(DecompilationUnit unit)
+        public string ToAsmString(DecompilationUnit unit, string outAsmFile)
         {
-            var builder = new StringBuilder();
+            var builder = new OutputBuilder(outAsmFile);
             var lineBuilder = new StringBuilder();
             var writer = new AssemblyWriter();
 

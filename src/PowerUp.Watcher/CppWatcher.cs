@@ -108,7 +108,7 @@ namespace PowerUp.Watcher
                                         Options = options
                                     };
 
-                                    var asmCode = ToAsmString(unit);
+                                    var asmCode = ToAsmString(unit, outAsmFile);
                                     File.WriteAllText(outAsmFile, asmCode);
                                 }
                             }
@@ -129,9 +129,9 @@ namespace PowerUp.Watcher
             return iDontCareAboutThisTask;
         }
 
-        public string ToAsmString(DecompilationUnit unit)
+        public string ToAsmString(DecompilationUnit unit, string outAsmFile)
         {
-            var builder     = new StringBuilder();
+            var builder     = new OutputBuilder(outAsmFile);
             var lineBuilder = new StringBuilder();
             var writer      = new AssemblyWriter();
 

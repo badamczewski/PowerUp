@@ -222,8 +222,9 @@ namespace PowerUp.Watcher
                                 }
                                 else
                                 {
+
                                     //
-                                    if (TryWriteASM(unit, out asmCode) == false)
+                                    if (TryWriteASM(unit, outAsmFile, out asmCode) == false)
                                     {
                                         XConsole.WriteLine($"Writing Errors to: {outAsmFile}");
                                     }
@@ -250,7 +251,7 @@ namespace PowerUp.Watcher
 
                                     XConsole.WriteLine($"Writing Results to: {outAsmFile}, {outILFile}, {outCSFile}");
 
-                                    WriteIfNotNullOrEmpty(outAsmFile, asmCode);
+                                    //WriteIfNotNullOrEmpty(outAsmFile, asmCode);
                                     WriteIfNotNullOrEmpty(outILFile, ilCode);
                                     WriteIfNotNullOrEmpty(outCSFile, csCode);
                                 }
@@ -297,7 +298,7 @@ namespace PowerUp.Watcher
             return isOK;
         }
 
-        private bool TryWriteASM(DecompilationUnit unit, out string result)
+        private bool TryWriteASM(DecompilationUnit unit, string outAsmFile, out string result)
         {
             bool isOK = false;
             result = string.Empty;
@@ -309,7 +310,7 @@ namespace PowerUp.Watcher
                 try
                 {
                     HideInternalDecompiledMethods(unit.DecompiledMethods);
-                    result = ToAsmString(unit);
+                    result = ToAsmString(unit, outAsmFile);
                     isOK = true;
                 }
                 catch (Exception ex)
@@ -321,7 +322,7 @@ namespace PowerUp.Watcher
             return isOK;
         }
 
-        private void WriteCompilerVersion(StringBuilder content, DecompilationUnit unit)
+        private void WriteCompilerVersion(OutputBuilder content, DecompilationUnit unit)
         {
             content.Append($"# C# {unit.OutputLanguageVersion} .NET: {Environment.Version.ToString()} {(_isPGO ? "PGO":"")}");
         }
@@ -467,9 +468,9 @@ namespace PowerUp.Watcher
             return layoutBuilder.ToString();
         }
 
-        public string ToAsmString(DecompilationUnit unit)
+        public string ToAsmString(DecompilationUnit unit, string outAsmFile)
         {
-            var builder     = new StringBuilder();
+            using var builder     = new OutputBuilder(outAsmFile);
             var lineBuilder = new StringBuilder();
             var writer      = new AssemblyWriter();
 
@@ -482,6 +483,7 @@ namespace PowerUp.Watcher
             if (unit.Options.HelpText != null)
             {
                 builder.Append(unit.Options.HelpText);
+                
                 return builder.ToString();
             }
 
@@ -662,6 +664,7 @@ namespace PowerUp.Watcher
                 }
             }
 
+            builder.Write();
             return builder.ToString();
         }
 

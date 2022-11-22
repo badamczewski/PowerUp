@@ -100,7 +100,7 @@ namespace PowerUp.Watcher
             Initialize(goFile, outAsmFile);
 
             var tmpAsmFile = outAsmFile + "_tmp.asm";
-            var command = $"{_pathToCompiler}go.exe tool compile -S {goFile} > {tmpAsmFile}";
+            var command = $"\"{_pathToCompiler}go.exe\" tool compile -S {goFile} > {tmpAsmFile}";
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
             var iDontCareAboutThisTask = Task.Run(async () =>
@@ -118,9 +118,17 @@ namespace PowerUp.Watcher
                                 lastCode = code;
                                 XConsole.WriteLine($"Calling: {command}");
 
-                                WatcherUtils.StartCompilerProcess(command);
+                                var messages = WatcherUtils.StartCompilerProcess(command);
                                 var options = WatcherUtils.ProcessCommandOptions(code);
                                 var methods = ParseASM(File.ReadAllText(tmpAsmFile), code);
+
+                                if(messages.messages != null)
+                                {
+                                    foreach (var message in messages.messages)
+                                    {
+                                        XConsole.WriteLine($"[GO] {message}");
+                                    }
+                                }
 
                                 var unit = new DecompilationUnit() 
                                 { 
@@ -128,9 +136,9 @@ namespace PowerUp.Watcher
                                     Options = options 
                                 };
 
-                                var asmCode = ToAsmString(unit);
+                                var asmCode = ToAsmString(unit, outAsmFile);
 
-                                File.WriteAllText(outAsmFile, asmCode);
+                                //File.WriteAllText(outAsmFile, asmCode);
 
                             }
                         }
@@ -150,9 +158,9 @@ namespace PowerUp.Watcher
             return iDontCareAboutThisTask;
         }
 
-        public string ToAsmString(DecompilationUnit unit)
+        public string ToAsmString(DecompilationUnit unit, string outAsmFile)
         {
-            var builder     = new StringBuilder();
+            var builder     = new OutputBuilder(outAsmFile);
             var lineBuilder = new StringBuilder();
             var writer      = new AssemblyWriter();
 
