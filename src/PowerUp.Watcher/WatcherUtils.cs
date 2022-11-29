@@ -309,7 +309,7 @@ namespace PowerUp.Watcher
                 //
                 else if (value == "up:optimization")
                 {
-                    // i + 1 = whitespace; i + 2 = word?
+                    // i + 1 = whitespace; i + 2 = word? 
                     if (MatchNext(tokens, ref i, "Word"))
                     {
                         var argValue = ParseCommandArgument(tokens, ref i, "level");

@@ -1014,13 +1014,41 @@ namespace PowerUp.Watcher
                         //
                         // Find the method under benchmark to extract it's attribute values.
                         //
-                        (long took, int warmUpCount, int runCount) summary =
-                           ((long, int, int))method.Invoke(instance, null);
+                        (decimal took, int warmUpCount, int runCount) summary =
+                           ((decimal, int, int))method.Invoke(instance, null);
 
                         messages.Add($"# [{order++}] ");
                         messages.Add($"# Method: {methodUnderBenchmarkName}");
                         messages.Add($"# Warm-up Count: {summary.warmUpCount} calls");
-                        messages.Add($"# Took {summary.took} ms / {summary.runCount} calls");
+
+                        string unit = "ms";
+                        //
+                        // Figure out the units of time.
+                        //
+                        var time = summary.took.ToString();
+                        if (time.Contains('.'))
+                        {
+                            int mul = 10;
+                            //
+                            // Get Leading zeros after mantisa
+                            //
+                            var mantisa = time.Split('.')[1];
+                            for (int i = 0; i < mantisa.Length; i++)
+                            {
+                                if (mantisa[i] == '0')
+                                {
+                                    mul *= 10;
+                                }
+                                else break;
+                            }
+                            if (mul == 1000)
+                            {
+                                unit = "μs";
+                                summary.took *= mul;
+                            }
+                        }
+
+                        messages.Add($"# Took {summary.took.ToString("F4")} {unit} / {summary.runCount} calls");
                         messages.Add("# ");
 
                         found.Messages.AddRange(messages);
@@ -1029,7 +1057,26 @@ namespace PowerUp.Watcher
                         messages.Clear();
                     }
                 }
-                else if(method.Name.StartsWith("SizeOf_"))
+                else if (method.Name.StartsWith("Run_"))
+                {
+                    var methodUnderRunName = method.Name.Split("_")[1];
+                    var found = decompiledMethods.FirstOrDefault(x => x.Name == methodUnderRunName);
+                    if (found != null)
+                    {
+                        method.Invoke(instance, null);
+                        var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
+
+                        foreach (var message in log)
+                        {
+                            messages.Add("# " + message);
+                        }
+                        found.Messages.AddRange(messages.ToArray());
+                        order++;
+
+                        messages.Clear();
+                    }
+                }
+                else if (method.Name.StartsWith("SizeOf_"))
                 {
                     if (typeLayouts != null)
                     {
@@ -1064,22 +1111,7 @@ namespace PowerUp.Watcher
                     {
                         var name = attribute.GetType().Name;
 
-                        if (name == "RunAttribute")
-                        {
-                            var found = decompiledMethods.FirstOrDefault(x => x.Name == method.Name);
-                            if (found != null)
-                            {
-                                method.Invoke(instance, null);
-                                var log = (List<string>)compiledLog.GetField("print", BindingFlags.Static | BindingFlags.Public).GetValue(null);
-
-                                messages.AddRange(log);
-                                found.Messages.AddRange(messages.ToArray());
-                                order++;
-
-                                messages.Clear();
-                            }
-                        }
-                        else if (name == "HideAttribute")
+                        if (name == "HideAttribute")
                         {
                             for (int i = 0; i < decompiledMethods.Length; i++)
                             {
