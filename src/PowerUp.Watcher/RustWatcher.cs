@@ -51,7 +51,7 @@ namespace PowerUp.Watcher
             Initialize(inputFile, outAsmFile);
 
             var tmpAsmFile = outAsmFile + "_tmp.asm";
-            var command = $"{_pathToCompiler}rustc.exe {inputFile} -o {tmpAsmFile} " +
+            var command = $"\"{_pathToCompiler}rustc.exe\" {inputFile} -o {tmpAsmFile} " +
                 "-C debuginfo=1 " +
                 $"--emit asm --crate-type rlib -Cllvm-args=--x86-asm-syntax=intel";
 

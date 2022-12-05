@@ -100,7 +100,7 @@ namespace PowerUp.Watcher
             Initialize(goFile, outAsmFile);
 
             var tmpAsmFile = outAsmFile + "_tmp.asm";
-            var command = $"{_pathToCompiler}go.exe tool compile -S {goFile} > {tmpAsmFile}";
+            var command = $"\"{_pathToCompiler}go.exe\" tool compile -S {goFile} > {tmpAsmFile}";
             string lastCode = null;
             DateTime lastWrite = DateTime.MinValue;
             var iDontCareAboutThisTask = Task.Run(async () =>
