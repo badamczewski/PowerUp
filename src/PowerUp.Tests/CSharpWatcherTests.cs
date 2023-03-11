@@ -98,6 +98,29 @@ namespace PowerUp.Tests
         }
 
         [Test]
+        public void DecompileToASM_EmptyGenericClassLayout_ShouldHaveTypeLayouts()
+        {
+            CSharpWatcher watcher = new CSharpWatcher(configuration);
+            watcher.InitializeCsharpCompiler();
+            var result = watcher.DecompileToASM("[JIT(typeof(int))] public class Empty<T>{}");
+
+            Assert.IsTrue(result.TypeLayouts.Length == 1);
+        }
+
+        //
+        // Curently not supported.
+        // 
+        //[Test]
+        //public void DecompileToASM_EmptyGenericStructLayout_ShouldHaveTypeLayouts()
+        //{
+        //    CSharpWatcher watcher = new CSharpWatcher(configuration);
+        //    watcher.InitializeCsharpCompiler();
+        //    var result = watcher.DecompileToASM("[JIT(typeof(int))] \r\n public struct Empty<T>{}");
+
+        //    Assert.IsTrue(result.TypeLayouts.Length == 1);
+        //}
+
+        [Test]
         public void DecompileToASM_EmptyStructLayout_ShouldHaveTypeLayouts()
         {
             CSharpWatcher watcher = new CSharpWatcher(configuration);

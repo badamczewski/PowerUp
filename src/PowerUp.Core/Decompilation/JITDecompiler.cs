@@ -103,7 +103,7 @@ namespace PowerUp.Core.Decompilation
                     var obj = runtime.Heap.GetObject((ulong)(p - 1));
                     if (obj.Type != null)
                     {
-                        if (obj.Type != null && obj.Type.Name == type.FullName)
+                        if (obj.Type != null)
                         {
                             fieldLayouts.Clear();
 
@@ -488,9 +488,10 @@ namespace PowerUp.Core.Decompilation
                     ulong address = 0;
                     string name = null;
                     uint size = 0;
+                    bool isTypeRef = false;
 
                     var hasAddress = GetReferencedAddressToMethodName(
-                        out address, out size, out name,
+                        out address, out size, out name, out isTypeRef,
                         instruction, runtime);
 
                     assemblyInstruction.Arguments = new InstructionArg[args.Length];
@@ -508,7 +509,7 @@ namespace PowerUp.Core.Decompilation
                         //
                         // Adressing, set the flag.
                         //
-                        if(value.StartsWith("[") && value.EndsWith("]"))
+                        if(value.Contains("[") && value.Contains("]"))
                         {
                             isAddressing = true;
                         }
@@ -520,7 +521,8 @@ namespace PowerUp.Core.Decompilation
                             CallCodeSize = size,
                             HasReferenceAddress = hasAddress,
                             AltValue = altValue,
-                            IsAddressing = isAddressing
+                            IsAddressing = isAddressing,
+                            IsRefType = isTypeRef,
                         };
                     }
                 }
@@ -566,7 +568,10 @@ namespace PowerUp.Core.Decompilation
                                 if (code.Offset == entry.ILOffset)
                                 {
                                     blockValue = code.SourceCodeBlock;
-                                    sliceValue = blockValue.Substring(code.StartCol - 1, code.EndCol - code.StartCol);
+                                    if (blockValue.Length != 0)
+                                    {
+                                        sliceValue = blockValue.Substring(code.StartCol - 1, code.EndCol - code.StartCol);
+                                    }
                                     //
                                     // Trim the code block, we don't want whitespaces in comments.
                                     //
@@ -652,11 +657,12 @@ namespace PowerUp.Core.Decompilation
             return trim;
         }
 
-        private bool GetReferencedAddressToMethodName(out ulong refAddress, out uint codeSize, out string name, Instruction instruction, ClrRuntime runtime)
+        private bool GetReferencedAddressToMethodName(out ulong refAddress, out uint codeSize, out string name, out bool isTypeRef, Instruction instruction, ClrRuntime runtime)
         {
             name = null;
             refAddress = 0;
             codeSize = 0;
+            isTypeRef = false;
 
             bool isAddressOk = false;
 
@@ -704,13 +710,6 @@ namespace PowerUp.Core.Decompilation
                 name = jitHelperFunctionName;
                 return true;
             }
-          
-            //var methodTableName = runtime.GetMethodTableName(refAddress);
-            //if (string.IsNullOrWhiteSpace(methodTableName) == false)
-            //{
-            //    name = methodTableName;
-            //    return true;
-            //}
 
             var methodDescriptor = runtime.GetMethodByHandle(refAddress);
             if (methodDescriptor != null)
@@ -731,20 +730,16 @@ namespace PowerUp.Core.Decompilation
                 return true;
             }
 
-            //if (methodCall == null)
-            //{
-            //    if (runtime.ReadPointer(refAddress, out ulong newAddress) && newAddress > ushort.MaxValue)
-            //        methodCall = runtime.GetMethodByInstructionPointer(newAddress);
-
-            //    if (methodCall is null)
-            //        return false;
-
-            //    name = methodCall.ToString();
-            //    refAddress = methodCall.HotColdInfo.HotStart;
-            //    codeSize = methodCall.HotColdInfo.HotSize;
-
-            //    return true;
-            //}
+            //
+            // This is not a method but a mov on type.
+            //
+            var typeInMT = runtime.GetTypeByMethodTable(refAddress);
+            if (typeInMT != null)
+            {
+                isTypeRef = true;
+                name = typeInMT.ToString();
+                return true;
+            }
 
             return false;
         }

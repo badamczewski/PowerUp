@@ -112,6 +112,9 @@ namespace PowerUp.Watcher
                     if (key.StartsWith("DOTNET"))
                     {
                         XConsole.WriteLine($"  `{entry.Key}` = {entry.Value}");
+                        //
+                        // This is not needed for newer versions of .NET
+                        //
                         if(key == "DOTNET_TieredPGO")
                         {
                             _isPGO = true;
@@ -132,6 +135,16 @@ namespace PowerUp.Watcher
             XConsole.WriteLine($"`Language  Version`: {_compiler.LanguageVersion.ToDisplayString()}");
             XConsole.WriteLine($"`.NET Version`: {Environment.Version.ToString()}");
             XConsole.WriteLine(IsDebug ? "'[DEBUG]'" : "`[RELEASE]`");
+
+            //
+            // Enable PGO for .NET 7 and higher.
+            // @NOTE: In theory for 7 it should be enabled but in practice it never worked
+            // without enabling PGO explicitly via env vars.
+            //
+            if(Environment.Version.Major >= 7)
+            {
+                _isPGO = true;
+            }
         }
 
 
@@ -471,7 +484,10 @@ namespace PowerUp.Watcher
         {
             var builder     = new StringBuilder();
             var lineBuilder = new StringBuilder();
-            var writer      = new AssemblyWriter();
+            var codeFlow    = new AsmCodeFlowAnalyser();
+            var writer      = new AssemblyWriter(codeFlow);
+
+            codeFlow.SetTypeInfo(unit.TypeLayouts);
 
             if(unit.Options.ShowHelp)
             {
@@ -494,7 +510,7 @@ namespace PowerUp.Watcher
                 builder.AppendLine(ToLayout(unit.TypeLayouts));
                 builder.AppendLine();
             }
-
+            
             var documentationOffset = unit.Options.ASMDocumentationOffset;
 
             //
@@ -538,7 +554,6 @@ namespace PowerUp.Watcher
                 (int jumpSize, int nestingLevel) sizeAndNesting = (-1,-1);
                 sizeAndNesting    = JumpGuideDetector.PopulateGuides(method);
                 var inliningCalls = InlineDetector.DetectInlining(method);
-
                 //
                 // Print messages.
                 //
@@ -639,6 +654,17 @@ namespace PowerUp.Watcher
                 {
                     if (inst.Type == InstructionType.Code && unit.Options.ShowSourceMaps == false) continue;
 
+                    //
+                    // In case of any unseen conequences we do a try here.
+                    //
+                    try
+                    {
+                        codeFlow.Process(inst);
+                    }
+                    catch 
+                    { 
+                        //@TODO Append to Console and Writer.
+                    }
                     //
                     // @TODO this is bad design, we should be using the string builder
                     // all the way without switching to string in between.

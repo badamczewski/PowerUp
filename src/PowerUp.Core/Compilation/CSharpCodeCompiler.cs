@@ -90,7 +90,10 @@ namespace PowerUp.Core.Compilation
 
                     {usingCode}
 
-                    [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+                   [System.AttributeUsage(
+                        AttributeTargets.Method | 
+                        AttributeTargets.Class  | 
+                        AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
                     sealed class JITAttribute : Attribute
                     {{
                         private Type[] _types;

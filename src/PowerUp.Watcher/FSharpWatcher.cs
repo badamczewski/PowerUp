@@ -390,7 +390,7 @@ namespace PowerUp.Watcher
         {
             var builder = new StringBuilder();
             var lineBuilder = new StringBuilder();
-            var writer = new AssemblyWriter();
+            var writer = new AssemblyWriter(new AsmCodeFlowAnalyser());
 
             if (unit.Options.ShowHelp)
             {

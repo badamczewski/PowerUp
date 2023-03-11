@@ -1,4 +1,5 @@
-﻿using PowerUp.Core.Compilation;
+﻿using Microsoft.Extensions.Primitives;
+using PowerUp.Core.Compilation;
 using PowerUp.Core.Console;
 using PowerUp.Core.Decompilation;
 using System;
@@ -18,6 +19,12 @@ namespace PowerUp.Watcher
     //
     public class AssemblyWriter
     {
+        private AsmCodeFlowAnalyser _asmCodeFlowAnalyser = null;
+        public AssemblyWriter(AsmCodeFlowAnalyser asmCodeFlowAnalyser) 
+        {
+            _asmCodeFlowAnalyser = asmCodeFlowAnalyser;
+        }
+
         //
         // This array contains all of the jump instructions for X86 ISA
         //
@@ -403,6 +410,7 @@ namespace PowerUp.Watcher
         {
             try
             {
+
                 int lineOffset = DocumentationOffset;
                 if (lineBuilder.Length < lineOffset)
                 {
@@ -416,10 +424,11 @@ namespace PowerUp.Watcher
                     case "movzx": DocumentMOVZX(lineBuilder, instruction); break;
                     case "shl":   DocumentSHL(lineBuilder, instruction); break;
                     case "shr":   DocumentSHR(lineBuilder, instruction); break;
+                    case "imul":  DocumentIMUL(lineBuilder, instruction); break;
                     case "lea":   DocumentLEA(lineBuilder, instruction); break;
                     case "inc":   DocumentINC(lineBuilder, instruction); break;
                     case "dec":   DocumentDEC(lineBuilder, instruction); break;
-                    case "call":  DocumentCALL(lineBuilder, instruction); break;
+                    case "call":  DocumentCALL(lineBuilder, instruction, method); break;
                     case "push":  DocumentPUSH(lineBuilder, instruction); break;
                     case "pop":   DocumentPOP(lineBuilder, instruction); break;
                     case "add":   DocumentADD(lineBuilder, instruction); break;
@@ -461,6 +470,30 @@ namespace PowerUp.Watcher
             }
         }
 
+        private void DocumentIMUL(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        {
+            if(instruction.Arguments.Length == 1)
+            {
+                var lhs = FormatArgument(instruction.Arguments[0].Value);
+                // EDX:EAX = EAX * Source; 
+                lineBuilder.Append($" # (edx:eax) = eax * {lhs} (signed)");
+            }
+            else if (instruction.Arguments.Length == 2)
+            {
+                var lhs = FormatArgument(instruction.Arguments[0].Value);
+                var rhs = FormatArgument(instruction.Arguments[1].Value);
+
+                if (lhs == "rsp")
+                {
+                    lineBuilder.Append($" # stack.push_times({int.Parse(rhs) / 8})");
+                }
+                else
+                {
+                    lineBuilder.Append($" # {lhs} *= {rhs} (signed)");
+                }
+            }
+        }
+
         private void DocumentNOP(StringBuilder lineBuilder, AssemblyInstruction instruction, DecompiledMethod method)
         {
             var multiByte = "";
@@ -487,7 +520,55 @@ namespace PowerUp.Watcher
             var lhs = FormatArgument(instruction.Arguments[0].Value);
             var rhs = FormatArgument(instruction.Arguments[1].Value);
 
-            lineBuilder.Append($" # {lhs} = {rhs}");
+            if (instruction.Arguments[0].IsAddressing)
+            {
+                var arg = instruction.Arguments[0];
+                var begin = arg.Value.IndexOf("[");
+                var end = arg.Value.IndexOf("]");
+
+                var value = arg.Value.Substring(begin + 1, end - begin - 1);
+                value = _asmCodeFlowAnalyser.GetValueFor(value);
+                if (string.IsNullOrEmpty(value) == false)
+                {
+                    lhs = value;
+                }
+                lineBuilder.Append($" # {lhs} = {rhs}");
+            }
+            else
+
+            //
+            // If this mov is a type reference we need to convert it to something like:
+            // get_ref(typeof(...));
+            //
+            if (instruction.Arguments[0].IsRefType)
+            {
+                //
+                // Value: X is in RDX
+                // Values[RDX] = X
+                //
+                // MOV RCX, RDX
+                // Values[RCX] = X
+                // MOV RDX, RAX <- Assume we don't know what's in RAX
+                // Values[RDX] = null
+                //
+
+                //
+                // In order to be able to do this correclty, we need to track the instruction
+                // because it might be used later by calls to new *but* we might mov it through registers.
+                // Since we don't have any code flow analyzer let's do a poor version for now ... and do a simple mov
+                // detector once we realize that we just loaded the type from MT.
+                //
+                // @TODO: Obviously we need code flow analyzer, it can be simple but we need to track each register used
+                // and it's value; What we are doing here is super silly...
+                //
+                lhs = FormatArgument(instruction.Arguments[0].AltValue);
+
+                lineBuilder.Append($" # {lhs} = typeof({rhs})");
+            }
+            else
+            {
+                lineBuilder.Append($" # {lhs} = {rhs}");
+            }
         }
 
         private void DocumentTEST(StringBuilder lineBuilder, AssemblyInstruction instruction, DecompiledMethod method)
@@ -572,7 +653,22 @@ namespace PowerUp.Watcher
         {
             var lhs = FormatArgument(instruction.Arguments[0].Value);
 
+            if (instruction.Arguments[0].IsAddressing)
+            {
+                var arg = instruction.Arguments[0];
+                var begin = arg.Value.IndexOf("[");
+                var end   = arg.Value.IndexOf("]");
+
+                var value = arg.Value.Substring(begin + 1, end - begin - 1);
+                value = _asmCodeFlowAnalyser.GetValueFor(value);
+                if(string.IsNullOrEmpty(value) == false)
+                {
+                    lhs = value;
+                }
+            }
+
             lineBuilder.Append($" # {lhs}++");
+
         }
 
         private void DocumentDEC(StringBuilder lineBuilder, AssemblyInstruction instruction)
@@ -582,13 +678,57 @@ namespace PowerUp.Watcher
             lineBuilder.Append($" # {lhs}--");
         }
 
-        private void DocumentCALL(StringBuilder lineBuilder, AssemblyInstruction instruction)
+        private void DocumentCALL(StringBuilder lineBuilder, AssemblyInstruction instruction, DecompiledMethod method)
         {
             var lhs = FormatArgument(instruction.Arguments[0].Value);
 
             if (lhs.StartsWith("CORINFO") && lhs.EndsWith("FAIL"))
             {
                 lineBuilder.Append($" # throw");
+            }
+            else if(lhs.StartsWith("CORINFO") && lhs.Contains("NEWARR"))
+            {
+                var possibleTypeName = string.Empty;
+
+                if (instruction.OrdinalIndex - 2 >= 0)
+                {
+                    var newType = method.Instructions[instruction.OrdinalIndex - 2];
+                    if (newType.Arguments.Any())
+                    {
+                        possibleTypeName = newType.Arguments[0].Value.Trim();
+                        if (_asmCodeFlowAnalyser.IsRegister(possibleTypeName) == false)
+                        {
+                            possibleTypeName = newType.Arguments[0].AltValue.Trim();
+                        }
+                        possibleTypeName = _asmCodeFlowAnalyser.GetValueFor(possibleTypeName);
+                    }
+                }
+
+                lineBuilder.Append($" # new {possibleTypeName}");
+            }
+            else if(lhs.StartsWith("CORINFO") && lhs.EndsWith("NEWSFAST"))
+            {
+                var possibleTypeName = string.Empty;
+
+                if (instruction.OrdinalIndex - 1 >= 0)
+                {
+                    var newType = method.Instructions[instruction.OrdinalIndex - 1];
+                    if (newType.Arguments.Any())
+                    {
+                        possibleTypeName = newType.Arguments[0].Value.Trim();
+                        if(_asmCodeFlowAnalyser.IsRegister(possibleTypeName) == false)
+                        {
+                            possibleTypeName = newType.Arguments[0].AltValue.Trim();
+                        }
+                        possibleTypeName = _asmCodeFlowAnalyser.GetValueFor(possibleTypeName);
+                    }
+                }
+
+                lineBuilder.Append($" # jit.alloc(typeof({possibleTypeName}))");
+            }
+            else
+            {
+                lineBuilder.Append($" # {lhs}");
             }
         }
         private void DocumentPUSH(StringBuilder lineBuilder, AssemblyInstruction instruction)

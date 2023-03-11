@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 
 namespace PowerUp.Core.Decompilation.Attributes
 {
-    [System.AttributeUsage(System.AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
+    [System.AttributeUsage(
+        AttributeTargets.Method | 
+        AttributeTargets.Class  | 
+        AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
     public class JITAttribute : Attribute
     {
         private Type[] _types;

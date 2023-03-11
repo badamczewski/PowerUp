@@ -6,6 +6,7 @@ using System.Text;
 using PowerUp.Core.Console;
 using System.Linq;
 using PowerUp.Core.Decompilation.Attributes;
+using Microsoft.CodeAnalysis;
 
 namespace PowerUp.Core.Decompilation
 {
@@ -29,6 +30,11 @@ namespace PowerUp.Core.Decompilation
                     IsValid = false,
                     Message = ""
                 };
+            }
+
+            if (typeInfo.IsGenericType)
+            {
+                typeInfo = MakeGenericType(typeInfo);
             }
 
             if (parameters == null)
@@ -138,6 +144,11 @@ namespace PowerUp.Core.Decompilation
 
         public static DecompiledMethod[] ToAsm(this Type typeInfo, ILMethodMap[] sourceCodeMap = null, bool @private = false)
         {
+            if (typeInfo.IsGenericType)
+            {
+                typeInfo = MakeGenericType(typeInfo);
+            }
+
             List<DecompiledMethod> methods = new List<DecompiledMethod>();
 
             foreach (var constructorInfo in typeInfo.GetConstructors())
@@ -164,6 +175,42 @@ namespace PowerUp.Core.Decompilation
             }
 
             return methods.ToArray();
+        }
+
+        private static Type MakeGenericType(Type typeInfo)
+        {
+            //
+            // There's a reason why we are not using a type class called JITAttribute
+            // (which we have in our lib), if we load the exact same code in two different
+            // application domains the runtime will refuse to cast them and raise
+            // InvalidCastException
+            // 
+            // We have to use reflection to be safe.
+            //
+            var attributes = typeInfo.GetCustomAttributes();
+            foreach (var attribute in attributes)
+            {
+                var type = attribute.GetType();
+                //
+                // If we find the correct attribute, then there's no turning back
+                // Use relection and should you fail, then fail fast.
+                //
+                // We need to make a generic method for each provided JIT attribute 
+                // So if we provide JIT[typeof(int)] JIT[typeof(string)] we are compiling not one,
+                // but two methods. 
+                //
+                // @TODO Multiple JIT attribute handling is not yet done.
+                //
+                if (type.Name == "JITAttribute")
+                {
+                    var props = type.GetProperties();
+                    var types = props.First(x => x.Name == "Types");
+                    var value = (Type[])types.GetValue(attribute);
+                    typeInfo = typeInfo.MakeGenericType(value.First());
+                    
+                }
+            }
+            return typeInfo;
         }
 
         /// <summary>

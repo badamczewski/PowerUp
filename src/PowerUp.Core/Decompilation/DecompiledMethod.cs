@@ -133,14 +133,30 @@ namespace PowerUp.Core.Decompilation
         public int JumpIndex { get; set; } = -1;
         public InstructionType Type { get; set; }
 
+        public AssemblyInstruction()
+        {
+            Type = InstructionType.ASM;
+        }
+
         public override string ToString()
         {
             return Instruction;
+        }
+
+        public bool IsNone()
+        {
+            return Type == InstructionType.None;
+        }
+
+        public static AssemblyInstruction None()
+        {
+            return new AssemblyInstruction() { Type = InstructionType.None };
         }
     }
 
     public enum InstructionType
     {
+        None,
         ASM,
         Code,
         RegMap
@@ -160,6 +176,7 @@ namespace PowerUp.Core.Decompilation
         public string Value { get; set; }
         public ulong CallAdress { get; set; }
         public ulong CallCodeSize { get; set; }
+        public bool IsRefType { get; set; }
         public bool HasReferenceAddress { get; set; }
         public string AltValue { get; set; }
         public bool IsAddressing { get; set; }
