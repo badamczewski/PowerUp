@@ -174,6 +174,10 @@ namespace PowerUp.Watcher
             {
                 _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet7"], LanguageVersion.CSharp10);
             }
+            else if (Environment.Version.Major == 8)
+            {
+                _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathNet7"], LanguageVersion.CSharp12);
+            }
             else
             {
                 _compiler = new CSharpCodeCompiler(_configuration["DotNetCoreDirPathDefault"]);
